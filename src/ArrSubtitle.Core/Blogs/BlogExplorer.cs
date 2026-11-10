@@ -113,7 +113,11 @@ public sealed class BlogExplorer(RequestSession session)
             if (seen.Count > 100) throw new CollectorException(ResultStatus.SearchIncomplete, "Blog page limit reached");
             FetchResult response;
             try { response = await session.GetAsync(current.Url, budget.Token, scope: u => BlogScope.Contains(blog, u)); }
-            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound) { continue; }
+            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                if (current.Depth > 0) hadError = true;
+                continue;
+            }
             catch (Exception ex) when (ex is not OperationCanceledException) { hadError = true; continue; }
             var xml = response.Text.TrimStart().StartsWith("<?xml", StringComparison.Ordinal) || response.ContentType?.Contains("xml", StringComparison.OrdinalIgnoreCase) == true;
             if (xml)

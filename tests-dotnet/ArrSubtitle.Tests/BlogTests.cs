@@ -94,4 +94,19 @@ public sealed class BlogTests
         await foreach (var post in explorer.ExploreAsync(new("https://author.tistory.com/", BlogPlatform.Tistory, "author.tistory.com"), new(1, "테스트", "Test", ["테스트"], "fixture"), default)) if (post.Title == "테스트 1화 자막") found = true;
         Assert.True(found);
     }
+
+    [Fact]
+    public async Task MissingSitemapPostMakesEnumerationIncomplete()
+    {
+        var handler = new ReplayHandler(r => r.RequestUri!.AbsolutePath switch
+        {
+            "/" => ReplayHandler.Text("<main>Blog</main>", "text/html"),
+            "/sitemap.xml" => ReplayHandler.Text("<urlset><url><loc>https://example.com/deleted</loc></url></urlset>", "application/xml"),
+            _ => new(System.Net.HttpStatusCode.NotFound)
+        });
+        using var session = new RequestSession(handler);
+        var explorer = new BlogExplorer(session);
+        await foreach (var _ in explorer.ExploreAsync(new("https://example.com/", BlogPlatform.Generic, "example.com"), new(1, "Test", "Test", ["Test"], "fixture"), default, exhaustive: true)) { }
+        Assert.False(explorer.Complete);
+    }
 }

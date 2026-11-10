@@ -79,7 +79,7 @@ public static class ArchiveSelector
         catch (InvalidDataException ex) { throw new CollectorException(ResultStatus.InvalidSubtitle, ex.Message); }
     }
 
-    private static void ValidateIdentity(string filename, ResolvedAnime anime, EpisodeNumber episode)
+    public static void ValidateIdentity(string filename, ResolvedAnime anime, EpisodeNumber episode)
     {
         var explicitEpisode = EpisodeEvidence.Explicit(filename);
         if (explicitEpisode.HasValue && explicitEpisode.Value != episode) throw new CollectorException(ResultStatus.AmbiguousMatch, "Attachment episode conflicts with request");
@@ -88,7 +88,7 @@ public static class ArchiveSelector
         if (season.HasValue && expectedSeason.HasValue && season != expectedSeason) throw new CollectorException(ResultStatus.AmbiguousMatch, "Attachment season conflicts with request");
         var stem = Path.GetFileNameWithoutExtension(filename);
         var prefix = Regex.Split(stem, @"(?:[sS]\d+[eE]\d+|(?<!\d)\d{1,4}(?:\.\d+)?)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1))[0];
-        prefix = Regex.Replace(prefix, @"\[[^\]]*\]|\b(?:attachment|subtitle|subtitles|episode|ep)\b", "", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).Trim(' ', '.', '_', '-');
+        prefix = Regex.Replace(prefix, @"\[[^\]]*\]|\b(?:attachment|subtitle|subtitles|episode|ep|batch)\b|자막", "", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).Trim(' ', '.', '_', '-');
         if (prefix.Length == 0) return;
         var key = IdentityKey(prefix);
         var matches = anime.Titles.Any(t => IdentityKey(t) == key || TitleMatcher.Normalize(t).StartsWith(TitleMatcher.Normalize(prefix) + " ", StringComparison.Ordinal) && key.Length >= 4);

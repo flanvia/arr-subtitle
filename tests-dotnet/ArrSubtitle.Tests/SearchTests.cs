@@ -62,4 +62,59 @@ public sealed class SearchTests
         Assert.Equal(new[] { 1, 2 }, report.Anime.Select(a => a.Anime.AnimeId));
         Assert.False(report.Success);
     }
+
+    [Fact]
+    public async Task DoesNotLimitExhaustiveSearchToSeedLabel()
+    {
+        var handler = new ReplayHandler(request =>
+        {
+            var uri = request.RequestUri!;
+            if (uri.AbsolutePath.StartsWith("/anime/list")) return ReplayHandler.Text("""{"code":"ok","data":{"content":[{"animeNo":1,"subject":"Test"}],"last":true}}""");
+            if (uri.AbsolutePath.Contains("caption")) return ReplayHandler.Text("""{"code":"ok","data":[{"episode":"1","website":"https://author.blogspot.com/1","name":"a","updDt":"2026"}]}""");
+            if (uri.AbsolutePath.Contains("animeNo")) return ReplayHandler.Text("""{"code":"ok","data":{"subject":"Test","originalSubject":"テスト"}}""");
+            if (uri.AbsolutePath == "/1") return ReplayHandler.Text("<meta property='og:title' content='Test 1화'><div class='post-body'><a href='https://files.example.com/01.smi'>01.smi</a></div><a href='/search/label/Test'>Test</a>", "text/html");
+            Assert.DoesNotContain("/-/", uri.AbsolutePath);
+            return ReplayHandler.Text("""{"feed":{"openSearch$totalResults":{"$t":"2"},"entry":[{"title":{"$t":"Test 1화"},"content":{"$t":"<a href='https://files.example.com/01.smi'>01.smi</a>"},"link":[{"rel":"alternate","href":"https://author.blogspot.com/1"}]},{"title":{"$t":"Test 2화"},"content":{"$t":"<a href='https://files.example.com/02.smi'>02.smi</a>"},"link":[{"rel":"alternate","href":"https://author.blogspot.com/2"}]}],"link":[]}}""");
+        });
+        using var session = new RequestSession(handler);
+        var report = await new SubtitleSearch(session, new()).SearchAsync("Test", default);
+        Assert.True(report.Success);
+        Assert.Equal(new[] { "1", "2" }, report.Anime.Single().Subtitles.Select(s => s.Episode));
+    }
+
+    [Theory]
+    [InlineData("Other S01E01.smi")]
+    [InlineData("Test S02E01.smi")]
+    public async Task RejectsConflictingAttachmentIdentity(string filename)
+    {
+        var handler = new ReplayHandler(request =>
+        {
+            var uri = request.RequestUri!;
+            if (uri.AbsolutePath.StartsWith("/anime/list")) return ReplayHandler.Text("""{"code":"ok","data":{"content":[{"animeNo":1,"subject":"Test 1기"}],"last":true}}""");
+            if (uri.AbsolutePath.Contains("caption")) return ReplayHandler.Text("""{"code":"ok","data":[]}""");
+            if (uri.AbsolutePath.Contains("animeNo")) return ReplayHandler.Text("""{"code":"ok","data":{"subject":"Test 1기","originalSubject":"Test"}}""");
+            return ReplayHandler.Text("{\"feed\":{\"openSearch$totalResults\":{\"$t\":\"1\"},\"entry\":[{\"title\":{\"$t\":\"Test 1기 1화\"},\"content\":{\"$t\":\"<a href='https://files.example.com/a.smi'>" + filename + "</a>\"},\"link\":[{\"rel\":\"alternate\",\"href\":\"https://global.blogspot.com/1\"}]}],\"link\":[]}}");
+        });
+        using var session = new RequestSession(handler);
+        var report = await new SubtitleSearch(session, new() { Blogs = [new("https://global.blogspot.com/", Core.Models.BlogPlatform.Blogspot, "global.blogspot.com")] }).SearchAsync("Test", default);
+        Assert.False(report.Success);
+        Assert.Empty(report.Anime.Single().Subtitles);
+    }
+
+    [Fact]
+    public async Task RecomputesEpisodeRangeAfterReadingFullPost()
+    {
+        var handler = new ReplayHandler(request =>
+        {
+            var uri = request.RequestUri!;
+            if (uri.AbsolutePath.StartsWith("/anime/list")) return ReplayHandler.Text("""{"code":"ok","data":{"content":[{"animeNo":1,"subject":"Test"}],"last":true}}""");
+            if (uri.AbsolutePath.Contains("caption")) return ReplayHandler.Text("""{"code":"ok","data":[]}""");
+            if (uri.AbsolutePath.Contains("animeNo")) return ReplayHandler.Text("""{"code":"ok","data":{"subject":"Test","originalSubject":"テスト"}}""");
+            if (uri.AbsolutePath == "/batch") return ReplayHandler.Text("<meta property='og:title' content='Test 1-3화'><div class='post-body'><a href='https://files.example.com/batch.zip'>자막.zip</a></div>", "text/html");
+            return ReplayHandler.Text("""{"feed":{"openSearch$totalResults":{"$t":"1"},"entry":[{"title":{"$t":"Test 자막"},"link":[{"rel":"alternate","href":"https://global.blogspot.com/batch"}]}],"link":[]}}""");
+        });
+        using var session = new RequestSession(handler);
+        var report = await new SubtitleSearch(session, new() { Blogs = [new("https://global.blogspot.com/", Core.Models.BlogPlatform.Blogspot, "global.blogspot.com")] }).SearchAsync("Test", default);
+        Assert.Equal(new[] { "1", "2", "3" }, report.Anime.Single().Subtitles.Select(s => s.Episode));
+    }
 }

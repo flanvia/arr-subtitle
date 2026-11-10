@@ -91,7 +91,7 @@ public sealed class SubtitleSearch(RequestSession session, CollectorSettings set
             var explorer = new BlogExplorer(session);
             try
             {
-                await foreach (var post in explorer.ExploreAsync(source.Blog, anime, ct, exhaustive: true, label: source.Label))
+                await foreach (var post in explorer.ExploreAsync(source.Blog, anime, ct, exhaustive: true))
                 {
                     if (!TitleMatcher.Mentions(post.Title + " " + string.Join(' ', post.Labels), anime.Titles)) continue;
                     try { await AddPostAsync(post, source.Blog, source.Maker, []); }
@@ -112,11 +112,6 @@ public sealed class SubtitleSearch(RequestSession session, CollectorSettings set
 
         async Task AddPostAsync(PostCandidate post, BlogDescriptor blog, string maker, EpisodeNumber[] authoritative)
         {
-            var season = TitleMatcher.ExplicitSeason(post.Title);
-            var expected = TitleMatcher.ExplicitSeason(anime.Title) ?? TitleMatcher.ExplicitSeason(anime.OriginalTitle);
-            if (season.HasValue && season != expected) return;
-            var episodes = ReadEpisodes(post.Title);
-            if (episodes.Length == 0) episodes = authoritative;
             if (post.Html.Length == 0) post = await new BlogExplorer(session).ReadPostAsync(post.Url, ct, blog);
             var attachments = AttachmentExtractor.Extract(post).Where(a => !EpisodeEvidence.IsAuxiliary(a.Filename)).ToArray();
             if (attachments.Length == 0)
@@ -124,6 +119,11 @@ public sealed class SubtitleSearch(RequestSession session, CollectorSettings set
                 post = await new BlogExplorer(session).ReadPostAsync(post.Url, ct, blog);
                 attachments = AttachmentExtractor.Extract(post).Where(a => !EpisodeEvidence.IsAuxiliary(a.Filename)).ToArray();
             }
+            var season = TitleMatcher.ExplicitSeason(post.Title);
+            var expected = TitleMatcher.ExplicitSeason(anime.Title) ?? TitleMatcher.ExplicitSeason(anime.OriginalTitle);
+            if (season.HasValue && season != expected) return;
+            var episodes = ReadEpisodes(post.Title);
+            if (episodes.Length == 0) episodes = authoritative;
             if (episodes.Length == 0) episodes = attachments.SelectMany(a => ReadEpisodes(a.Filename)).Distinct().ToArray();
             if (episodes.Length == 0 || attachments.Length == 0)
             {
@@ -131,10 +131,20 @@ public sealed class SubtitleSearch(RequestSession session, CollectorSettings set
             }
             foreach (var episode in episodes)
             {
-                var matching = attachments.Where(a => EpisodeEvidence.Explicit(a.Filename) is not { } number || number == episode || ReadEpisodes(a.Filename).Contains(episode)).Select(a => a.Filename).Distinct().ToArray();
+                var matching = attachments.Where(a => MatchesAttachment(a.Filename, episode)).Select(a => a.Filename).Distinct().ToArray();
                 if (matching.Length == 0) { complete = false; continue; }
                 var page = DestinationPolicy.Redact(post.Url);
                 listings[(episode.Value, page)] = new(episode.Value, maker, page, matching);
+            }
+
+            bool MatchesAttachment(string filename, EpisodeNumber episode)
+            {
+                var namedEpisodes = ReadEpisodes(filename);
+                if (namedEpisodes.Length > 0 && !namedEpisodes.Contains(episode)) return false;
+                var representative = namedEpisodes.FirstOrDefault();
+                var normalized = Regex.Replace(filename, @"(?<!\d)\d{1,4}\s*[-~]\s*\d{1,4}", representative.Value ?? episode.Value, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+                try { ArchiveSelector.ValidateIdentity(normalized, anime with { Season = expected }, representative.Value is not null ? representative : episode); return true; }
+                catch (CollectorException) { complete = false; attempts.Add(new(DestinationPolicy.Redact(post.Url), "attachment-conflict", "Attachment title, season or episode conflicts with anime")); return false; }
             }
         }
     }

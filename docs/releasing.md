@@ -47,7 +47,9 @@ Release 작업은 태그가 현재 기본 브랜치 이력에 포함된 commit�
 - [x] 기존 C# 소스와 테스트만 별도 폴더에 복사
 - [x] 6개 대상 의존성과 OS 경로 및 파일명 호환성 확인
 - [x] CI 및 태그 Release workflow 작성
-- [ ] 공개할 파일과 작성자 확인 후 독립 Git 이력 생성
-- [ ] public 저장소 생성 및 push
-- [ ] GitHub Actions 결과 확인 및 실패 수정
+- [x] 공개할 파일과 작성자 확인 후 독립 Git 이력 생성
+- [x] public 저장소 생성 및 push
+- [x] GitHub Actions 결과 확인 및 실패 수정
 - [ ] 초기 태그 Release와 6개 배포물 확인
+
+첫 CI 실행에서 6개 대상 모두 테스트, NativeAOT 게시 및 바이너리 smoke를 통과했다. 실행 기록: https://github.com/flanvia/arr-subtitle/actions/runs/42742403372
