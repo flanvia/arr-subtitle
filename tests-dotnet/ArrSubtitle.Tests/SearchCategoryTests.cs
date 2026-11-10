@@ -122,6 +122,24 @@ public sealed class SearchCategoryTests
         Assert.Empty(report.Anime.Single().Subtitles);
     }
 
+    [Theory]
+    [InlineData("Other 01.smi", "Test")]
+    [InlineData("Test!! 01.smi", "Test!!!")]
+    public async Task MatchingPostCannotPromoteUnverifiedAttachmentAlias(string filename, string animeTitle)
+    {
+        var handler = new ReplayHandler(request =>
+        {
+            var uri = request.RequestUri!;
+            if (uri.AbsolutePath.Contains("/anime/list/", StringComparison.Ordinal)) return ReplayHandler.Text("""{"code":"ok","data":{"content":[{"animeNo":1,"subject":"TITLE","originalSubject":"TITLE"}],"last":true}}""".Replace("TITLE", animeTitle, StringComparison.Ordinal));
+            if (uri.AbsolutePath.Contains("caption", StringComparison.Ordinal)) return ReplayHandler.Text("""{"code":"ok","data":[{"episode":"1","website":"https://example.tistory.com/1","name":"Maker","updDt":"2026"}]}""");
+            return ReplayHandler.Text($"<meta property='og:title' content='{animeTitle} 1화'><script>window.T.entryInfo = {{\"categoryLabel\":\"Subtitles\"}};</script><div class='contents_style'><a href='https://files.example.com/{Uri.EscapeDataString(filename)}'>{filename}</a></div>", "text/html");
+        });
+        using var session = new RequestSession(handler);
+        var report = await new SubtitleSearch(session, new() { AniListEnabled = false }).SearchAsync(animeTitle, default);
+        Assert.Empty(report.Anime.Single().Subtitles);
+        Assert.False(report.Success);
+    }
+
     [Fact]
     public async Task EmbeddedCategoryPostsKeepCategoryIdentity()
     {

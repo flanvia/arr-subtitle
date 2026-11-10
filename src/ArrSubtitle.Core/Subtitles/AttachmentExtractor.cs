@@ -28,7 +28,7 @@ public static class AttachmentExtractor
                 if (id is null || !Regex.IsMatch(id, @"^[A-Za-z0-9_-]+$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1))) continue;
                 url = new("https://drive.google.com/uc?export=download&id=" + id);
             }
-            if (!Extensions.Contains(Path.GetExtension(filename).ToLowerInvariant()))
+            if (!Extensions.Contains(Path.GetExtension(filename).ToLowerInvariant()) && !drive)
             {
                 var query = BlogDetector.ParseQuery(url.Query);
                 filename = query.GetValueOrDefault("filename") ?? query.GetValueOrDefault("name") ?? Uri.UnescapeDataString(Path.GetFileName(url.AbsolutePath));

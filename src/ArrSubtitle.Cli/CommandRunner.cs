@@ -30,7 +30,7 @@ public static class CommandRunner
                 """);
             return 0;
         }
-        if (args.Length == 1 && args[0] == "--version") { await output.WriteLineAsync("0.1.1"); return 0; }
+        if (args.Length == 1 && args[0] == "--version") { await output.WriteLineAsync("0.1.2"); return 0; }
         var json = args.Contains("--json");
         try
         {

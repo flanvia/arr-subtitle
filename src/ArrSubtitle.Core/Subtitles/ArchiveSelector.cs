@@ -10,22 +10,14 @@ public static class EpisodeEvidence
 {
     public static EpisodeNumber? Explicit(string filename)
     {
-        var stem = Path.GetFileNameWithoutExtension(filename);
-        var serial = Regex.Match(stem, @"[sS]\d+[eE](\d{1,4})(?!\d)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
-        if (serial.Success) return EpisodeNumber.Parse(serial.Groups[1].Value);
-        var variant = Regex.Match(stem, @"(?:^|\s)(\d{1,4})(?:ns|s)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
-        if (variant.Success) return EpisodeNumber.Parse(variant.Groups[1].Value);
-        var match = Regex.Match(stem, @"(?:[sS]\d+[eE]|(?:^|[\s_-]))(\d{1,4}(?:\.\d+)?)(?:v\d+)?(?:화|회)?(?=$|[\s_\[\(])", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
-        return match.Success && EpisodeNumber.TryParse(match.Groups[1].Value, out var episode) ? episode : null;
+        var episodes = EpisodeParser.Read(filename);
+        return episodes.Length == 1 ? episodes[0] : null;
     }
 
     public static bool Matches(string text, EpisodeNumber episode)
     {
-        var serial = Regex.Match(text, @"[sS]\d+[eE](\d{1,4})(?!\d)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
-        if (serial.Success) return EpisodeNumber.Parse(serial.Groups[1].Value) == episode;
-        var escaped = Regex.Escape(episode.Value).Replace(@"\.", @"[._]");
-        if (Regex.IsMatch(text, @"(?<!\d)\d+\s*[-~]\s*\d+(?!\d)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1))) return false;
-        return Regex.IsMatch(text, @"(?<![\d.])0*" + escaped + @"(?:v\d+)?(?!\d|[._]\d)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+        var episodes = EpisodeParser.Read(text);
+        return episodes.Length == 1 && episodes[0] == episode;
     }
 
     public static bool IsAuxiliary(string filename) => Regex.IsMatch(filename, @"(?:\b(?:OP|ED|FONT|FONTS|NCOP|NCED)\b|폰트|글꼴)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
@@ -83,12 +75,20 @@ public static class ArchiveSelector
 
     public static void ValidateIdentity(string filename, ResolvedAnime anime, EpisodeNumber episode)
     {
-        var explicitEpisode = EpisodeEvidence.Explicit(filename);
+        var identityText = filename;
+        foreach (var title in anime.Titles.Where(t => !string.IsNullOrWhiteSpace(t)).OrderByDescending(t => t.Length))
+        {
+            var match = Regex.Match(identityText, @"(?<![\p{L}\p{N}])" + Regex.Escape(title) + @"(?![\p{L}\p{N}!'’])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+            if (!match.Success) continue;
+            identityText = identityText.Remove(match.Index, match.Length).Insert(match.Index, " ");
+            break;
+        }
+        var explicitEpisode = EpisodeEvidence.Explicit(identityText);
         if (explicitEpisode.HasValue && explicitEpisode.Value != episode) throw new CollectorException(ResultStatus.AmbiguousMatch, "Attachment episode conflicts with request");
         var season = TitleMatcher.ExplicitSeason(filename);
         var expectedSeason = anime.Season ?? TitleMatcher.ExplicitSeason(anime.Title) ?? TitleMatcher.ExplicitSeason(anime.OriginalTitle);
         if (season.HasValue && expectedSeason.HasValue && season != expectedSeason) throw new CollectorException(ResultStatus.AmbiguousMatch, "Attachment season conflicts with request");
-        var stem = Path.GetFileNameWithoutExtension(filename);
+        var stem = Path.GetFileNameWithoutExtension(identityText);
         stem = Regex.Replace(stem, @"시즌\s*(\d+)", " $1기", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
         var labelledEpisode = Regex.Match(stem, @"(?<!\d)(\d{1,4})\s*(?:기|期)\s*(?:제\s*)?\d+\s*(?:화|회)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
         if (labelledEpisode.Success) stem = Regex.Replace(stem, @"\s*\d+\s*(?:기|期)\s*(?=제?\s*\d+\s*(?:화|회))", " ", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
