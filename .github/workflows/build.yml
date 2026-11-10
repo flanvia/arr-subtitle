@@ -1,0 +1,151 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+
+jobs:
+  build:
+    name: ${{ matrix.rid }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            runner: ubuntu-24.04
+            asset: linux-x64
+          - rid: linux-arm64
+            runner: ubuntu-24.04-arm
+            asset: linux-arm64
+          - rid: osx-x64
+            runner: macos-15-intel
+            asset: darwin-x64
+          - rid: osx-arm64
+            runner: macos-15
+            asset: darwin-arm64
+          - rid: win-x64
+            runner: windows-2025
+            asset: windows-x64
+          - rid: win-arm64
+            runner: windows-11-arm
+            asset: windows-arm64
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          global-json-file: global.json
+      - name: Install Linux native build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+      - name: Restore locked dependencies
+        run: dotnet restore ArrSubtitle.slnx --locked-mode
+      - name: Build
+        run: dotnet build ArrSubtitle.slnx -c Release --no-restore
+      - name: Test
+        run: dotnet test tests-dotnet/ArrSubtitle.Tests -c Release --no-build --no-restore
+      - name: Publish CLI
+        run: dotnet publish src/ArrSubtitle.Cli -c Release -r ${{ matrix.rid }} --no-restore -o artifacts/cli -p:TreatWarningsAsErrors=true
+      - name: Publish smoke runner
+        run: dotnet publish tests-dotnet/ArrSubtitle.Smoke -c Release -r ${{ matrix.rid }} --no-restore -o artifacts/smoke -p:TreatWarningsAsErrors=true
+      - name: Run native binaries
+        shell: pwsh
+        run: |
+          $suffix = if ($IsWindows) { '.exe' } else { '' }
+          $cli = Join-Path $PWD "artifacts/cli/arr-subtitle$suffix"
+          $smoke = Join-Path $PWD "artifacts/smoke/ArrSubtitle.Smoke$suffix"
+          & $cli --help
+          if ($LASTEXITCODE -ne 0) { throw 'Native CLI help failed' }
+          & $cli --version
+          if ($LASTEXITCODE -ne 0) { throw 'Native CLI version failed' }
+          & $smoke direct 1
+          if ($LASTEXITCODE -ne 0) { throw 'Direct download smoke failed' }
+          & $smoke batch 12
+          if ($LASTEXITCODE -ne 0) { throw 'Batch download smoke failed' }
+          & $smoke missing 1
+          if ($LASTEXITCODE -ne 0) { throw 'Missing subtitle smoke failed' }
+          & $smoke search 1
+          if ($LASTEXITCODE -ne 0) { throw 'Exhaustive search smoke failed' }
+      - name: Package
+        shell: pwsh
+        env:
+          ASSET: ${{ matrix.asset }}
+        run: |
+          $stage = Join-Path $PWD 'artifacts/package'
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+          $suffix = if ($IsWindows) { '.exe' } else { '' }
+          Copy-Item "artifacts/cli/arr-subtitle$suffix" $stage
+          Copy-Item config.example.json $stage
+          Copy-Item README.md $stage
+          $name = "arr-subtitle-$env:ASSET"
+          if ($IsWindows) {
+            Compress-Archive -Path "$stage/*" -DestinationPath "artifacts/$name.zip"
+          } else {
+            & tar -czf "artifacts/$name.tar.gz" -C $stage .
+            if ($LASTEXITCODE -ne 0) { throw 'Archive creation failed' }
+          }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: arr-subtitle-${{ matrix.asset }}
+          path: |
+            artifacts/arr-subtitle-*.tar.gz
+            artifacts/arr-subtitle-*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify release tag
+        env:
+          TAG: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git check-ref-format "refs/tags/$TAG"
+          git merge-base --is-ancestor HEAD "origin/$DEFAULT_BRANCH"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: arr-subtitle-*
+          path: dist
+          merge-multiple: true
+      - name: Publish checked artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          cd dist
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 6
+          sha256sum arr-subtitle-* > SHA256SUMS
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --draft --title "$TAG" --generate-notes
+          fi
+          gh release upload "$TAG" arr-subtitle-* SHA256SUMS --clobber
+          gh release edit "$TAG" --draft=false
