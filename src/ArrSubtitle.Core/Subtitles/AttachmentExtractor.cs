@@ -19,6 +19,7 @@ public static class AttachmentExtractor
             var raw = link.GetAttribute("href");
             if (!Uri.TryCreate(new Uri(post.Url), raw, out var url) || url.Scheme is not ("http" or "https")) continue;
             var filename = link.GetAttribute("download") ?? link.GetAttribute("data-filename") ?? link.GetAttribute("data-file-name") ?? link.GetAttribute("data-origin-name") ?? link.TextContent.Trim();
+            filename = Regex.Replace(filename, @"\s+\d+(?:\.\d+)?\s*(?:KB|MB|GB|B)\s*$", "", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
             var drive = url.Host == "drive.google.com";
             if (drive)
             {

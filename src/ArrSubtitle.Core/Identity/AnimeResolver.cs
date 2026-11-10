@@ -11,7 +11,7 @@ public sealed class AnimeResolver(RequestSession session, CollectorSettings sett
 {
     public AnimeMapping? GetMapping(AnimeQuery query)
     {
-        var matches = settings.Mappings.Where(m => (query.Season is null || m.Season == query.Season) && (TitleMatcher.Equal(m.Title, query.Title ?? "") || m.Aliases.Any(a => TitleMatcher.Equal(a, query.Title ?? "") || TitleMatcher.Equal(a, query.FileTitle ?? ""))) && (m.LibraryPath is null || query.LibraryPath is not null && Path.GetFullPath(m.LibraryPath) == Path.GetFullPath(query.LibraryPath))).ToArray();
+        var matches = settings.Mappings.Where(m => (query.Season is null || m.Season == query.Season) && (query.AnimeId.HasValue ? query.AnimeId == m.AnimeId : TitleMatcher.Equal(m.Title, query.Title ?? "") || m.Aliases.Any(a => TitleMatcher.Equal(a, query.Title ?? "") || TitleMatcher.Equal(a, query.FileTitle ?? ""))) && (m.LibraryPath is null || query.LibraryPath is not null && Path.GetFullPath(m.LibraryPath) == Path.GetFullPath(query.LibraryPath))).ToArray();
         if (matches.Length > 1) throw new CollectorException(ResultStatus.AmbiguousMatch, "Multiple explicit mappings match");
         return matches.SingleOrDefault();
     }

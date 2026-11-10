@@ -63,7 +63,9 @@ public sealed class AnissiaClient(RequestSession session)
             foreach (var item in content.EnumerateArray())
             {
                 var id = item.GetProperty("animeNo").GetInt32();
-                candidates[id] = new(id, item.GetProperty("subject").GetString() ?? "", item.TryGetProperty("originalSubject", out var native) ? native.GetString() ?? "" : "");
+                var subject = item.GetProperty("subject").GetString();
+                if (id < 1 || string.IsNullOrWhiteSpace(subject)) throw new InvalidDataException("Invalid anime search entry");
+                candidates[id] = new(id, subject, item.TryGetProperty("originalSubject", out var native) ? native.GetString() ?? "" : "");
             }
             if (list.TryGetProperty("last", out var last) && last.GetBoolean()) return candidates.Values.ToArray();
             if (list.TryGetProperty("totalPages", out var totalPages) && totalPages.GetInt32() <= page + 1) return candidates.Values.ToArray();

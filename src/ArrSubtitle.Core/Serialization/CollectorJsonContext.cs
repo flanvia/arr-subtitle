@@ -1,4 +1,7 @@
 using System.Text.Json.Serialization;
+using System.Text.Json;
+using System.Text.Encodings.Web;
+using System.Text.Unicode;
 using ArrSubtitle.Core.Configuration;
 using ArrSubtitle.Core.Models;
 
@@ -10,4 +13,12 @@ namespace ArrSubtitle.Core.Serialization;
 [JsonSerializable(typeof(BlogDescriptor[]))]
 [JsonSerializable(typeof(BlogDescriptor))]
 [JsonSerializable(typeof(SubtitleSearchReport))]
-public partial class CollectorJsonContext : JsonSerializerContext;
+public partial class CollectorJsonContext : JsonSerializerContext
+{
+    public static CollectorJsonContext Readable { get; } = new(new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.Create(UnicodeRanges.All)
+    });
+}

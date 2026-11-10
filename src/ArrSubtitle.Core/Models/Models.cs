@@ -28,21 +28,22 @@ public sealed record Caption(string Episode, string Website, string Name, string
 public sealed record AnimeDetail(int AnimeId, string Title, string OriginalTitle);
 public sealed record CollectionRequest(AnimeQuery Query, EpisodeTarget[] Episodes, string OutputDirectory, bool SearchOnly = false);
 public sealed record SourceAttempt(string Source, string Status, string? Error = null);
-public sealed record EpisodeResult(string Episode, ResultStatus Status, string? Path = null, string? Page = null, string? Sha256 = null, string? Error = null, string? ArchiveMember = null);
+public sealed record EpisodeResult(string Episode, ResultStatus Status, string? Path = null, string? Page = null, string? Sha256 = null, string? Error = null, string? ArchiveMember = null, string? SourceEpisode = null, string? NumberingEvidence = null);
 public sealed record CollectionReport(string RequestId, ResolvedAnime? Anime, EpisodeResult[] Episodes, SourceAttempt[] Attempts, Dictionary<string, int> Requests, long ReceivedBytes, double ElapsedMilliseconds, double? FirstCandidateMilliseconds, string? ManifestPath = null)
 {
     public bool Success => Episodes.Length > 0 && Episodes.All(e => e.Status is ResultStatus.Downloaded or ResultStatus.AlreadyPresent or ResultStatus.Found);
 }
-public sealed record PostCandidate(string Url, string Title, string Html, string[] Labels);
+public sealed record PostCandidate(string Url, string Title, string Html, string[] Labels, bool IsSummary = false, string? CategoryUrl = null);
 public sealed record AttachmentCandidate(string Url, string Filename, string Page);
 public sealed record SubtitlePayload(byte[] Bytes, string Extension, string? ArchiveMember);
 public sealed record MediaIdentity(AnimeQuery Query, EpisodeNumber Episode);
-public sealed record SubtitleListing(string Episode, string Maker, string Page, string[] Attachments);
+public sealed record SubtitleListing(string Episode, string Maker, string Page, string[] Attachments, string? SourceEpisode = null, string? NumberingEvidence = null);
 public sealed record AnimeSearchResult(ResolvedAnime Anime, SubtitleListing[] Subtitles, string[] MissingEpisodes, bool Complete, SourceAttempt[] Attempts);
 public sealed record SubtitleSearchReport(string Query, AnimeSearchResult[] Anime, bool Complete, SourceAttempt[] Attempts, Dictionary<string, int> Requests, double ElapsedMilliseconds)
 {
     public bool Success => Complete && Anime.Length > 0 && Anime.All(a => a.Complete && a.MissingEpisodes.Length == 0 && a.Subtitles.Length > 0);
 }
+public sealed record SearchProgress(string Stage, string Source, string? Episode = null, string? Detail = null);
 public sealed class CollectorException(ResultStatus status, string message) : Exception(message)
 {
     public ResultStatus Status { get; } = status;

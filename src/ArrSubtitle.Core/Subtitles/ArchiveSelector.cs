@@ -13,6 +13,8 @@ public static class EpisodeEvidence
         var stem = Path.GetFileNameWithoutExtension(filename);
         var serial = Regex.Match(stem, @"[sS]\d+[eE](\d{1,4})(?!\d)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
         if (serial.Success) return EpisodeNumber.Parse(serial.Groups[1].Value);
+        var variant = Regex.Match(stem, @"(?:^|\s)(\d{1,4})(?:ns|s)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+        if (variant.Success) return EpisodeNumber.Parse(variant.Groups[1].Value);
         var match = Regex.Match(stem, @"(?:[sS]\d+[eE]|(?:^|[\s_-]))(\d{1,4}(?:\.\d+)?)(?:v\d+)?(?:화|회)?(?=$|[\s_\[\(])", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
         return match.Success && EpisodeNumber.TryParse(match.Groups[1].Value, out var episode) ? episode : null;
     }
@@ -87,8 +89,12 @@ public static class ArchiveSelector
         var expectedSeason = anime.Season ?? TitleMatcher.ExplicitSeason(anime.Title) ?? TitleMatcher.ExplicitSeason(anime.OriginalTitle);
         if (season.HasValue && expectedSeason.HasValue && season != expectedSeason) throw new CollectorException(ResultStatus.AmbiguousMatch, "Attachment season conflicts with request");
         var stem = Path.GetFileNameWithoutExtension(filename);
+        stem = Regex.Replace(stem, @"시즌\s*(\d+)", " $1기", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+        var labelledEpisode = Regex.Match(stem, @"(?<!\d)(\d{1,4})\s*(?:기|期)\s*(?:제\s*)?\d+\s*(?:화|회)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+        if (labelledEpisode.Success) stem = Regex.Replace(stem, @"\s*\d+\s*(?:기|期)\s*(?=제?\s*\d+\s*(?:화|회))", " ", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
         var prefix = Regex.Split(stem, @"(?:[sS]\d+[eE]\d+|(?<!\d)\d{1,4}(?:\.\d+)?)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1))[0];
         prefix = Regex.Replace(prefix, @"\[[^\]]*\]|\b(?:attachment|subtitle|subtitles|episode|ep|batch)\b|자막", "", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).Trim(' ', '.', '_', '-');
+        prefix = Regex.Replace(prefix, @"\s+제$", "", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
         if (prefix.Length == 0) return;
         var key = IdentityKey(prefix);
         var matches = anime.Titles.Any(t => IdentityKey(t) == key || TitleMatcher.Normalize(t).StartsWith(TitleMatcher.Normalize(prefix) + " ", StringComparison.Ordinal) && key.Length >= 4);

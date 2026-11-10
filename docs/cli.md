@@ -7,12 +7,16 @@
 ```sh
 dotnet build ArrSubtitle.slnx -c Release
 dotnet test tests-dotnet/ArrSubtitle.Tests -c Release
+sh scripts/build-openssl.sh "$PWD/artifacts/openssl"
+export OPENSSL_ROOT_DIR="$PWD/artifacts/openssl"
+export PKG_CONFIG_PATH="$OPENSSL_ROOT_DIR/lib/pkgconfig"
+export LIBRARY_PATH="$OPENSSL_ROOT_DIR/lib"
 dotnet publish src/ArrSubtitle.Cli -c Release -r linux-x64 -o artifacts/linux-x64
 ```
 
 Linux, macOS 및 Windows의 x64와 ARM64를 지원 대상으로 한다. .NET RID는 `linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`, `win-x64`, `win-arm64`다. 각 OS와 CPU의 러너에서 NativeAOT 게시와 실행을 검증한다.
 
-Linux에는 clang 및 개발 라이브러리, macOS에는 Xcode Command Line Tools, Windows에는 해당 아키텍처용 Visual C++ 도구가 필요하다. 게시된 바이너리는 .NET 런타임을 포함하지만 완전 정적 바이너리는 아니다. macOS 및 Windows 배포물은 개발자 인증서로 서명하지 않는다.
+Linux에는 clang, cmake, make, perl 및 개발 라이브러리, macOS에는 Xcode Command Line Tools, Windows에는 해당 아키텍처용 Visual C++ 도구가 필요하다. 위 OpenSSL 빌드 단계는 Linux에서만 수행한다. 게시된 Linux 바이너리는 OpenSSL 3.5.9를 정적으로 포함하므로 실행할 때 libssl 설치와 `LD_LIBRARY_PATH`가 필요 없다. SDK 자체 실행에 필요한 라이브러리는 별도다. 게시물은 완전 정적 바이너리가 아니며 시스템 CA와 국제화 라이브러리는 필요하다. macOS 및 Windows 배포물은 개발자 인증서로 서명하지 않는다.
 
 ## 영상 기반
 
@@ -21,7 +25,10 @@ Linux에는 clang 및 개발 라이브러리, macOS에는 Xcode Command Line Too
 ```sh
 arr-subtitle search '흉란영애'
 arr-subtitle search '흉란영애' --json
+arr-subtitle search 'Working' --timeout 30 --json
 ```
+
+검색의 기본 제한 시간은 60초이며 `--timeout`은 1초부터 600초까지 받는다. 조사 중인 출처와 발견 회차는 stderr로 즉시 출력한다. 취소 및 시간 제한 시에도 발견한 부분 결과를 반환하며, 완전한 검색으로 처리하지 않는다.
 
 ```sh
 artifacts/linux-x64/arr-subtitle match '/media/Kyouran Reijou Nia Liston/Season 1/Kyouran Reijou Nia Liston - 05.mkv'
@@ -80,6 +87,8 @@ artifacts/linux-x64/arr-subtitle blogs remove https://bluewater91.blogspot.com/
 ## 결과
 
 `--json`은 stdout에 JSON 결과만 출력한다. 실행별 manifest에는 성공과 실패 회차, 출처, 오류 및 자막 해시를 기록한다. 영상 기반 manifest는 사용자 데이터 디렉터리의 `arr-subtitle/runs/`, 작품 기반 manifest는 지정 출력 폴더에 저장한다. manifest를 캐시나 성공 색인으로 다시 읽지 않는다.
+
+한국어와 일본어는 JSON에서도 UTF-8 문자로 출력한다. 전체 자막과 합본 검색은 회차 목록 검증을 위해 ZIP을 받을 수 있지만 검색 결과 파일로 저장하지 않는다.
 
 | 코드 | 의미 |
 | --- | --- |

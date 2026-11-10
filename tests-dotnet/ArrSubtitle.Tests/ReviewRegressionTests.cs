@@ -88,7 +88,7 @@ public sealed class ReviewRegressionTests
         using var dir = new TempDirectory(); var path = Path.Combine(dir.Path, "config.json");
         await SettingsStore.UpdateAsync(path, new(), "missing", default);
         var current = await SettingsStore.LoadAsync(path, default);
-        var oversized = new CollectorSettings { Mappings = [new("테스트", 1, 1, [new string('가', 180000)])] };
+        var oversized = new CollectorSettings { Mappings = [new("테스트", 1, 1, [new string('가', 400000)])] };
         await Assert.ThrowsAsync<InvalidDataException>(() => SettingsStore.UpdateAsync(path, oversized, current.Hash, default));
         Assert.Equal(current.Hash, (await SettingsStore.LoadAsync(path, default)).Hash);
     }
@@ -126,6 +126,6 @@ public sealed class ReviewRegressionTests
         var report = await new SubtitleCollector(session, new()).CollectAsync(new(new(AnimeId: 1), [new(EpisodeNumber.Parse("1"))], dir.Path), default);
         Assert.True(report.Success);
         Assert.Contains("a.blogspot.com", report.Episodes[0].Page);
-        Assert.DoesNotContain(handler.Calls, c => c.Contains("b.blogspot.com"));
+        Assert.DoesNotContain(handler.Calls, c => c.Contains("b.blogspot.com/feeds", StringComparison.Ordinal));
     }
 }

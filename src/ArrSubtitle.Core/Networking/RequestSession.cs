@@ -15,7 +15,7 @@ public sealed record FetchResult(Uri Url, byte[] Bytes, string? ContentType, str
 public sealed class RequestSession : IDisposable
 {
     private readonly HttpClient client;
-    private readonly ConcurrentDictionary<string, Lazy<Task<FetchResult>>> requests = new();
+    private readonly ConcurrentDictionary<string, PendingRequest> requests = new();
     private readonly ConcurrentDictionary<string, SemaphoreSlim> hostLocks = new();
     private readonly ConcurrentDictionary<string, long> lastStarts = new();
     private readonly ConcurrentDictionary<string, int> counts = new();
@@ -23,12 +23,14 @@ public sealed class RequestSession : IDisposable
     private long bytes;
     private long retained;
     private readonly CancellationToken lifetime;
+    private readonly Action<string>? requestStarted;
     public long ReceivedBytes => Interlocked.Read(ref bytes);
     public Dictionary<string, int> RequestCounts => counts.ToDictionary();
 
-    public RequestSession(HttpMessageHandler? handler = null, CancellationToken lifetime = default)
+    public RequestSession(HttpMessageHandler? handler = null, CancellationToken lifetime = default, Action<string>? requestStarted = null)
     {
         this.lifetime = lifetime;
+        this.requestStarted = requestStarted;
         client = new(handler ?? CreateHandler()) { Timeout = Timeout.InfiniteTimeSpan };
         client.DefaultRequestHeaders.UserAgent.ParseAdd("ArrSubtitle/0.1");
     }
@@ -64,12 +66,41 @@ public sealed class RequestSession : IDisposable
         DestinationPolicy.ValidateUrl(uri);
         if (scope is not null && !scope(uri)) throw new HttpRequestException("URL outside blog scope");
         var key = $"{uri.AbsoluteUri}|{limit}|{(body is null ? "GET" : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(body))))}";
-        var lazy = requests.GetOrAdd(key, _ => new(() => SendAsync(uri, body, limit, scope, lifetime), LazyThreadSafetyMode.ExecutionAndPublication));
-        FetchResult result;
-        try { result = await lazy.Value.WaitAsync(ct); }
-        catch { if (lazy.IsValueCreated && lazy.Value.IsCompleted && !lazy.Value.IsCompletedSuccessfully) requests.TryRemove(key, out _); throw; }
-        if (scope is not null && !scope(result.Url)) throw new HttpRequestException("Redirect outside blog scope");
-        return result;
+        PendingRequest entry;
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            entry = requests.GetOrAdd(key, _ => new(lifetime, token => SendAsync(uri, body, limit, scope, token)));
+            lock (entry)
+            {
+                if (!entry.Abandoned) { entry.Waiters++; break; }
+            }
+            requests.TryRemove(new KeyValuePair<string, PendingRequest>(key, entry));
+        }
+        var task = entry.Task.Value;
+        try
+        {
+            var result = await task.WaitAsync(ct);
+            if (scope is not null && !scope(result.Url)) throw new HttpRequestException("Redirect outside blog scope");
+            return result;
+        }
+        finally
+        {
+            var stop = false;
+            lock (entry)
+            {
+                entry.Waiters--;
+                if (entry.Waiters == 0 && !task.IsCompleted) { entry.Abandoned = true; stop = true; }
+            }
+            if (stop)
+            {
+                requests.TryRemove(new KeyValuePair<string, PendingRequest>(key, entry));
+                await entry.Cancellation.CancelAsync();
+                try { await task; } catch (Exception) { }
+                entry.Cancellation.Dispose();
+            }
+            else if (task.IsCompleted && !task.IsCompletedSuccessfully) requests.TryRemove(new KeyValuePair<string, PendingRequest>(key, entry));
+        }
     }
 
     private async Task<FetchResult> SendAsync(Uri initial, string? initialBody, int limit, Func<Uri, bool>? scope, CancellationToken ct)
@@ -97,6 +128,7 @@ public sealed class RequestSession : IDisposable
                     using var request = new HttpRequestMessage(body is null ? HttpMethod.Get : HttpMethod.Post, uri);
                     if (body is not null) request.Content = new StringContent(body, Encoding.UTF8, "application/json");
                     counts.AddOrUpdate(uri.IdnHost, 1, (_, n) => n + 1);
+                    requestStarted?.Invoke(DestinationPolicy.Redact(uri.AbsoluteUri));
                     using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
                     var status = (int)response.StatusCode;
                     if (status is 301 or 302 or 303 or 307 or 308)
@@ -131,6 +163,7 @@ public sealed class RequestSession : IDisposable
                     if (Interlocked.Add(ref retained, payload.Length) > 128L * 1024 * 1024) throw new InvalidDataException("Request memory budget exceeded");
                     return new(uri, payload, response.Content.Headers.ContentType?.MediaType, response.Content.Headers.ContentDisposition?.FileNameStar ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
                 }
+                catch (OperationCanceledException ex) when (!ct.IsCancellationRequested) { throw new HttpRequestException("HTTP request timed out", ex); }
                 finally { global.Release(); }
             }
             finally { hostLock.Release(); }
@@ -142,5 +175,20 @@ public sealed class RequestSession : IDisposable
     {
         client.Dispose(); global.Dispose();
         foreach (var item in hostLocks.Values) item.Dispose();
+        foreach (var item in requests.Values) item.Cancellation.Dispose();
+    }
+
+    private sealed class PendingRequest
+    {
+        public CancellationTokenSource Cancellation { get; }
+        public Lazy<Task<FetchResult>> Task { get; }
+        public int Waiters;
+        public bool Abandoned;
+
+        public PendingRequest(CancellationToken lifetime, Func<CancellationToken, Task<FetchResult>> send)
+        {
+            Cancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetime);
+            Task = new(() => send(Cancellation.Token), LazyThreadSafetyMode.ExecutionAndPublication);
+        }
     }
 }

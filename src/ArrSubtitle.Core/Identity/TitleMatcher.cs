@@ -19,7 +19,7 @@ public static class TitleMatcher
 
     public static int? ExplicitSeason(string text)
     {
-        var match = Regex.Match(text, @"(?:\bS(?:EASON\s*)?0*(\d+)(?=\b|E\d)|(?<!\d)(\d+)\s*(?:기|期))", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
-        return match.Success ? int.Parse(match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value) : null;
+        var match = Regex.Match(text, @"(?:\bS(?:EASON\s*)?0*(\d+)(?=\b|E\d)|(?<!\d)(\d+)\s*(?:기|期)|시즌\s*(\d+))", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+        return match.Success ? int.Parse(match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Success ? match.Groups[2].Value : match.Groups[3].Value) : null;
     }
 }

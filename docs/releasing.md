@@ -28,6 +28,8 @@ push, PR 및 수동 실행에서 다음을 확인한다.
 5. 게시된 fixture 실행기의 직접 다운로드, 12화 합본과 미발견 시나리오 실행
 6. 실행 파일과 설정 예제를 압축하고 artifact 업로드
 
+Linux는 `scripts/build-openssl.sh`에서 고정 OpenSSL 3.5.9 소스의 SHA-256을 검증한 뒤 정적 라이브러리를 빌드한다. CLI와 smoke에 `StaticOpenSslLinking=true`를 적용한다. OpenSSL 4 기반 Fedora 컨테이너에서도 HTTPS와 인증서 검증을 실행한다. 배포물에 `OPENSSL-LICENSE.txt`와 `OPENSSL-VERSION`을 포함한다. 보안 수정은 OpenSSL 버전과 해시를 갱신한 새 빌드를 배포해야 하며 사용자 시스템 OpenSSL 업데이트만으로 포함된 버전이 갱신되지는 않는다.
+
 CI에서 외부 자막 파일을 수집하지 않는다. 비밀 값 없는 fixture로 네트워크와 파일 검증을 재현한다. 외부 사이트의 일시 장애로 기본 CI가 실패하지 않게 한다.
 
 검사 작업은 저장소 읽기 권한만 사용한다. action은 commit SHA로 고정한다. PR의 코드를 저장소 쓰기 권한으로 실행하지 않는다.

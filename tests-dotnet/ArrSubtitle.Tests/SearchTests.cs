@@ -111,6 +111,7 @@ public sealed class SearchTests
             if (uri.AbsolutePath.Contains("caption")) return ReplayHandler.Text("""{"code":"ok","data":[]}""");
             if (uri.AbsolutePath.Contains("animeNo")) return ReplayHandler.Text("""{"code":"ok","data":{"subject":"Test","originalSubject":"テスト"}}""");
             if (uri.AbsolutePath == "/batch") return ReplayHandler.Text("<meta property='og:title' content='Test 1-3화'><div class='post-body'><a href='https://files.example.com/batch.zip'>자막.zip</a></div>", "text/html");
+            if (uri.Host == "files.example.com") return ReplayHandler.Bytes(Samples.Zip(("Test 01.smi", Samples.Utf16), ("Test 02.smi", Samples.Utf16), ("Test 03.smi", Samples.Utf16)));
             return ReplayHandler.Text("""{"feed":{"openSearch$totalResults":{"$t":"1"},"entry":[{"title":{"$t":"Test 자막"},"link":[{"rel":"alternate","href":"https://global.blogspot.com/batch"}]}],"link":[]}}""");
         });
         using var session = new RequestSession(handler);

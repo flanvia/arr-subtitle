@@ -17,17 +17,30 @@ if (TitleMatcher.Equal("Working!!", "Working'!!") || !TitleMatcher.Equal("凶乱
 var settings = JsonSerializer.Deserialize("{}", CollectorJsonContext.Default.CollectorSettings)!;
 if (settings.Mappings is null || settings.Blogs is null) throw new Exception("JSON settings defaults were not initialized: " + JsonSerializer.Serialize(settings, CollectorJsonContext.Default.CollectorSettings));
 var scenario = args.FirstOrDefault() ?? "batch";
+if (scenario == "tls")
+{
+    using var client = new System.Net.Http.HttpClient();
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("ArrSubtitle-CI/0.1");
+    client.Timeout = TimeSpan.FromSeconds(20);
+    using var response = await client.GetAsync("https://example.com/");
+    response.EnsureSuccessStatusCode();
+    Console.WriteLine("HTTPS certificate validation passed");
+    return;
+}
 var count = args.Length > 1 ? int.Parse(args[1], CultureInfo.InvariantCulture) : 12;
 if (count is < 1 or > 12) throw new ArgumentException("Invalid scenario episode count");
 var directory = Path.Combine(Path.GetTempPath(), "arr-subtitle-smoke-" + Guid.NewGuid().ToString("N"));
 try
 {
     using var session = new RequestSession(new ReplayHandler(scenario));
-    if (scenario == "search")
+    if (scenario is "search" or "search-cancel")
     {
-        var search = await new SubtitleSearch(session, settings with { Blogs = [new("https://fallback.blogspot.com/", BlogPlatform.Blogspot, "fallback.blogspot.com")] }).SearchAsync("테스트", default);
-        if (!search.Success || search.Anime.Single().Subtitles.Length != 12) throw new Exception("Search omitted episodes");
-        Console.WriteLine(JsonSerializer.Serialize(search, CollectorJsonContext.Default.SubtitleSearchReport));
+        using var cancellation = new CancellationTokenSource();
+        var search = await new SubtitleSearch(session, settings with { Blogs = [new("https://fallback.blogspot.com/", BlogPlatform.Blogspot, "fallback.blogspot.com")] }).SearchAsync("테스트", cancellation.Token, update => { if (scenario == "search-cancel" && update.Stage == "found") cancellation.Cancel(); });
+        if (scenario == "search" ? !search.Success || search.Anime.Single().Subtitles.Length != 12 : search.Complete || search.Anime.Single().Subtitles.Length == 0) throw new Exception("Search omitted episodes or cancellation state");
+        var output = JsonSerializer.Serialize(search, CollectorJsonContext.Readable.SubtitleSearchReport);
+        if (!output.Contains("테스트", StringComparison.Ordinal)) throw new Exception("Readable JSON escaped Korean text");
+        Console.WriteLine(output);
         return;
     }
     var collector = new SubtitleCollector(session, settings with { Blogs = [new("https://fallback.blogspot.com/", BlogPlatform.Blogspot, "fallback.blogspot.com")] });
@@ -35,7 +48,7 @@ try
     if (scenario == "missing" ? report.Success : !report.Success) throw new Exception("Unexpected smoke result: " + JsonSerializer.Serialize(report, CollectorJsonContext.Default.CollectionReport));
     if (report.Requests["api.anissia.net"] != 2) throw new Exception("Repeated metadata fetch");
     if (scenario == "batch" && report.Requests["files.example.com"] != 1) throw new Exception("Repeated batch download");
-    Console.WriteLine(JsonSerializer.Serialize(report, CollectorJsonContext.Default.CollectionReport));
+    Console.WriteLine(JsonSerializer.Serialize(report, CollectorJsonContext.Readable.CollectionReport));
 }
 finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
 

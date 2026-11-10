@@ -54,7 +54,15 @@ jobs:
           global-json-file: global.json
       - name: Install Linux native build dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev cmake make perl
+      - name: Build pinned static OpenSSL
+        if: runner.os == 'Linux'
+        run: |
+          prefix="$RUNNER_TEMP/arr-subtitle-openssl"
+          sh scripts/build-openssl.sh "$prefix"
+          echo "OPENSSL_ROOT_DIR=$prefix" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$prefix/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "LIBRARY_PATH=$prefix/lib" >> "$GITHUB_ENV"
       - name: Restore locked dependencies
         run: dotnet restore ArrSubtitle.slnx --locked-mode
       - name: Build
@@ -83,6 +91,20 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Missing subtitle smoke failed' }
           & $smoke search 1
           if ($LASTEXITCODE -ne 0) { throw 'Exhaustive search smoke failed' }
+          & $smoke search-cancel 1
+          if ($LASTEXITCODE -ne 0) { throw 'Partial search cancellation smoke failed' }
+      - name: Verify Linux HTTPS without host OpenSSL 3
+        if: runner.os == 'Linux'
+        run: |
+          docker run --rm -v "$PWD/artifacts/cli:/app:ro" fedora:45 /app/arr-subtitle --version
+          docker run --rm -v "$PWD/artifacts/smoke:/app:ro" fedora:45 sh -c 'dnf -y install libicu ca-certificates && /app/ArrSubtitle.Smoke tls 1'
+      - name: Reject unexpected dynamic OpenSSL dependency
+        if: runner.os == 'Linux'
+        run: |
+          if ldd artifacts/cli/arr-subtitle | grep -E 'libssl|libcrypto'; then
+            echo 'Linux executable still depends on host OpenSSL' >&2
+            exit 1
+          fi
       - name: Package
         shell: pwsh
         env:
@@ -94,6 +116,10 @@ jobs:
           Copy-Item "artifacts/cli/arr-subtitle$suffix" $stage
           Copy-Item config.example.json $stage
           Copy-Item README.md $stage
+          if ($IsLinux) {
+            Copy-Item "$env:OPENSSL_ROOT_DIR/OPENSSL-LICENSE.txt" $stage
+            Copy-Item "$env:OPENSSL_ROOT_DIR/OPENSSL-VERSION" $stage
+          }
           $name = "arr-subtitle-$env:ASSET"
           if ($IsWindows) {
             Compress-Archive -Path "$stage/*" -DestinationPath "artifacts/$name.zip"

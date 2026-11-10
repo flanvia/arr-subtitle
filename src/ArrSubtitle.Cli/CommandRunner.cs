@@ -25,11 +25,12 @@ public static class CommandRunner
                   collect --anime-id 3433 --episodes 1-5 --output <directory>
                   blogs add <url> | blogs list | blogs remove <url>
                 Options: --config <path>, --json, --season <number>, --anime-id <number>
+                Search: --timeout <seconds> (default 60, maximum 600)
                 Exit codes: 0 success, 1 partial or source failure, 2 invalid request, 130 cancelled
                 """);
             return 0;
         }
-        if (args.Length == 1 && args[0] == "--version") { await output.WriteLineAsync("0.1.0"); return 0; }
+        if (args.Length == 1 && args[0] == "--version") { await output.WriteLineAsync("0.1.1"); return 0; }
         var json = args.Contains("--json");
         try
         {
@@ -40,25 +41,33 @@ public static class CommandRunner
                 if (args[i] == "--json") continue;
                 if (!args[i].StartsWith("--", StringComparison.Ordinal)) { positional.Add(args[i]); continue; }
                 var key = args[i][2..];
-                if (!new[] { "config", "anime-id", "episodes", "output", "season" }.Contains(key) || i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal) || !options.TryAdd(key, args[++i])) throw new ArgumentException("Invalid or duplicate option");
+                if (!new[] { "config", "anime-id", "episodes", "output", "season", "timeout" }.Contains(key) || i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal) || !options.TryAdd(key, args[++i])) throw new ArgumentException("Invalid or duplicate option");
             }
             var configPath = options.GetValueOrDefault("config") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "arr-subtitle", "config.json");
             var loaded = await SettingsStore.LoadAsync(configPath, ct);
             if (options.ContainsKey("config") && loaded.Hash == "missing") throw new ArgumentException("Explicit settings file does not exist");
-            using var session = new RequestSession(lifetime: ct);
+            var synchronizedError = TextWriter.Synchronized(error);
+            using var session = new RequestSession(lifetime: ct, requestStarted: positional.FirstOrDefault() == "search" ? url => synchronizedError.WriteLine($"[request] {url}") : null);
             if (positional.Count == 0) throw new ArgumentException("Command required");
             var command = positional[0];
             if (command == "search")
             {
-                if (positional.Count != 2 || options.Keys.Any(k => k != "config")) throw new ArgumentException("search requires one query and accepts only config and json options");
-                var report = await new SubtitleSearch(session, loaded.Settings).SearchAsync(positional[1], ct);
-                if (json) await output.WriteLineAsync(JsonSerializer.Serialize(report, CollectorJsonContext.Default.SubtitleSearchReport));
+                if (positional.Count != 2 || options.Keys.Any(k => k is not ("config" or "timeout"))) throw new ArgumentException("search requires one query and accepts only config, json and timeout options");
+                var seconds = options.TryGetValue("timeout", out var rawTimeout) ? int.Parse(rawTimeout, System.Globalization.CultureInfo.InvariantCulture) : 60;
+                if (seconds is < 1 or > 600) throw new ArgumentException("Search timeout must be between 1 and 600 seconds");
+                void Progress(SearchProgress update) => synchronizedError.WriteLine($"[{update.Stage}] {update.Source}{(update.Episode is null ? "" : " episode " + update.Episode)}{(update.Detail is null ? "" : " | " + update.Detail)}");
+                var report = await new SubtitleSearch(session, loaded.Settings).SearchAsync(positional[1], ct, Progress, TimeSpan.FromSeconds(seconds));
+                if (json) await output.WriteLineAsync(JsonSerializer.Serialize(report, CollectorJsonContext.Readable.SubtitleSearchReport));
                 else
                 {
                     foreach (var anime in report.Anime)
                     {
                         await output.WriteLineAsync($"{anime.Anime.AnimeId}: {anime.Anime.Title}");
-                        foreach (var subtitle in anime.Subtitles) await output.WriteLineAsync($"  {subtitle.Episode}: {subtitle.Maker} | {subtitle.Page} | {string.Join(", ", subtitle.Attachments)}");
+                        foreach (var subtitle in anime.Subtitles)
+                        {
+                            var sourceNumber = subtitle.SourceEpisode is not null && subtitle.SourceEpisode != subtitle.Episode ? $" (source {subtitle.SourceEpisode})" : "";
+                            await output.WriteLineAsync($"  {subtitle.Episode}{sourceNumber}: {subtitle.Maker} | {subtitle.Page} | {string.Join(", ", subtitle.Attachments)}");
+                        }
                         if (anime.MissingEpisodes.Length > 0) await output.WriteLineAsync($"  Missing episodes: {string.Join(", ", anime.MissingEpisodes)}");
                         if (!anime.Complete) await output.WriteLineAsync("  Search incomplete");
                         foreach (var attempt in anime.Attempts.Where(a => a.Error is not null)) await error.WriteLineAsync($"{attempt.Source}: {attempt.Error}");
@@ -68,18 +77,19 @@ public static class CommandRunner
                 }
                 return ct.IsCancellationRequested ? 130 : report.Success ? 0 : 1;
             }
+            if (options.ContainsKey("timeout")) throw new ArgumentException("timeout is only supported by search");
             if (command == "blogs")
             {
                 if (positional.Count == 2 && positional[1] == "list")
                 {
-                    await output.WriteLineAsync(JsonSerializer.Serialize(loaded.Settings.Blogs, CollectorJsonContext.Default.BlogDescriptorArray)); return 0;
+                    await output.WriteLineAsync(JsonSerializer.Serialize(loaded.Settings.Blogs, CollectorJsonContext.Readable.BlogDescriptorArray)); return 0;
                 }
                 if (positional.Count != 3 || positional[1] is not ("add" or "remove")) throw new ArgumentException("Invalid blogs command");
                 var descriptor = positional[1] == "remove" ? BlogDetector.Known(new Uri(positional[2])) ?? loaded.Settings.Blogs.FirstOrDefault(b => b.Url == positional[2]) ?? throw new ArgumentException("Blog not registered") : await new BlogDetector(session).DetectAsync(new Uri(positional[2]), ct);
                 var blogs = loaded.Settings.Blogs.Where(b => b.Id != descriptor.Id || b.Platform != descriptor.Platform).ToList();
                 if (positional[1] == "add") blogs.Add(descriptor);
                 await SettingsStore.UpdateAsync(configPath, loaded.Settings with { Blogs = blogs.ToArray() }, loaded.Hash, ct);
-                await output.WriteLineAsync(JsonSerializer.Serialize(descriptor, CollectorJsonContext.Default.BlogDescriptor));
+                await output.WriteLineAsync(JsonSerializer.Serialize(descriptor, CollectorJsonContext.Readable.BlogDescriptor));
                 return 0;
             }
             int? animeId = options.TryGetValue("anime-id", out var rawId) ? int.Parse(rawId, System.Globalization.CultureInfo.InvariantCulture) : null;
@@ -136,9 +146,9 @@ public static class CommandRunner
                 var manifestRoot = command == "collect" ? Path.GetFullPath(outputDirectory) : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "arr-subtitle", "runs");
                 var manifest = Path.Combine(manifestRoot, "run-" + combined.RequestId + ".json");
                 combined = combined with { ManifestPath = manifest };
-                await AtomicFile.WriteAsync(manifest, JsonSerializer.SerializeToUtf8Bytes(combined, CollectorJsonContext.Default.CollectionReport), false, CancellationToken.None);
+                await AtomicFile.WriteAsync(manifest, JsonSerializer.SerializeToUtf8Bytes(combined, CollectorJsonContext.Readable.CollectionReport), false, CancellationToken.None);
             }
-            if (json) await output.WriteLineAsync(JsonSerializer.Serialize(combined, CollectorJsonContext.Default.CollectionReport));
+            if (json) await output.WriteLineAsync(JsonSerializer.Serialize(combined, CollectorJsonContext.Readable.CollectionReport));
             else
             {
                 foreach (var result in combined.Episodes) await output.WriteLineAsync($"{result.Episode}: {result.Status} {result.Path ?? result.Page ?? result.Error}");

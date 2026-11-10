@@ -25,7 +25,7 @@ public static class SettingsStore
         using var guard = new FileStream(path + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         var current = await LoadAsync(path, ct);
         if (current.Hash != expectedHash) throw new IOException("Settings changed concurrently");
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(settings, CollectorJsonContext.Default.CollectorSettings);
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(settings, CollectorJsonContext.Readable.CollectorSettings);
         if (bytes.Length > 1024 * 1024) throw new InvalidDataException("Settings exceed size limit");
         await AtomicFile.WriteAsync(path, bytes, true, ct);
     }

@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup Condition="'$(OutputType)' == 'Exe' and ('$(RuntimeIdentifier)' == 'linux-x64' or '$(RuntimeIdentifier)' == 'linux-arm64')">
+    <StaticOpenSslLinking>true</StaticOpenSslLinking>
+  </PropertyGroup>
+</Project>

@@ -109,4 +109,60 @@ public sealed class BlogTests
         await foreach (var _ in explorer.ExploreAsync(new("https://example.com/", BlogPlatform.Generic, "example.com"), new(1, "Test", "Test", ["Test"], "fixture"), default, exhaustive: true)) { }
         Assert.False(explorer.Complete);
     }
+
+    [Fact]
+    public async Task TraversalDeduplicatesArticleCategoryAndFragmentVariants()
+    {
+        var handler = new ReplayHandler(r => r.RequestUri!.AbsolutePath switch
+        {
+            "/" => ReplayHandler.Text("<main><a href='/1'>Test 1화</a><a href='/1?category=123#comment'>Test 1화</a><a href='/unrelated?page=1'>Other</a></main>", "text/html"),
+            "/1" => ReplayHandler.Text("<meta property='og:title' content='Test 1화'><article><a href='https://files.example.com/01.smi'>01.smi</a></article>", "text/html"),
+            _ => new(System.Net.HttpStatusCode.NotFound)
+        });
+        using var session = new RequestSession(handler);
+        var explorer = new BlogExplorer(session);
+        await foreach (var _ in explorer.ExploreAsync(new("https://example.com/", BlogPlatform.Generic, "example.com"), new(1, "Test", "Test", ["Test"], "fixture"), default)) { }
+        Assert.Single(handler.Calls, c => new Uri(c).AbsolutePath == "/1");
+        Assert.DoesNotContain(handler.Calls, c => c.Contains("unrelated", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task TistorySearchPageYieldsEmbeddedPostsWithoutRefetchingThem()
+    {
+        var handler = new ReplayHandler(r => r.RequestUri!.AbsolutePath.StartsWith("/search/", StringComparison.Ordinal)
+            ? ReplayHandler.Text("<h2><a href='/1'>Test 1화</a></h2><div class='entry'><div class='contents_style'><a href='https://files.example.com/01.smi'>01.smi</a></div></div><h2><a href='/2'>Test 2화</a></h2><div class='entry'><div class='contents_style'><a href='https://files.example.com/02.smi'>02.smi</a></div></div>", "text/html")
+            : new(System.Net.HttpStatusCode.NotFound));
+        using var session = new RequestSession(handler);
+        var explorer = new BlogExplorer(session);
+        var posts = new List<PostCandidate>();
+        await foreach (var post in explorer.ExploreAsync(new("https://example.tistory.com/", BlogPlatform.Tistory, "example.tistory.com"), new(1, "Test", "Test", ["Test"], "fixture"), default))
+        {
+            posts.Add(post);
+            if (posts.Count == 2) break;
+        }
+        Assert.Equal(new[] { "Test 1화", "Test 2화" }, posts.Select(p => p.Title));
+        Assert.Single(handler.Calls);
+    }
+
+    [Fact]
+    public async Task PaginationDoesNotChangeCategoryOrFollowCalendar()
+    {
+        var handler = new ReplayHandler(r => r.RequestUri!.AbsolutePath.StartsWith("/search/", StringComparison.Ordinal)
+            ? ReplayHandler.Text("<div class='paging'><a class='next' href='/search/Test?page=2'>Next</a><a href='/search/Test?category=Other&page=3'>3</a></div><a href='/archive/202611' rel='next'>Next</a>", "text/html")
+            : new(System.Net.HttpStatusCode.NotFound));
+        using var session = new RequestSession(handler);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await foreach (var _ in new BlogExplorer(session).ExploreAsync(new("https://example.tistory.com/", BlogPlatform.Tistory, "example.tistory.com"), new(1, "Test", "Test", ["Test"], "fixture"), cancellation.Token)) { }
+        Assert.DoesNotContain(handler.Calls, c => c.Contains("category=Other", StringComparison.Ordinal) || c.Contains("/archive/", StringComparison.Ordinal));
+        Assert.Single(handler.Calls, c => c.Contains("page=2", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task NaverBlogHomeLinkIsNotAnotherPostPage()
+    {
+        var handler = new ReplayHandler(_ => ReplayHandler.Text("<main><a href='https://blog.naver.com/author/'>Blog home</a></main>", "text/html"));
+        using var session = new RequestSession(handler);
+        await foreach (var _ in new BlogExplorer(session).ExploreAsync(new("https://blog.naver.com/author", BlogPlatform.Naver, "author"), new(1, "Test", "Test", ["Test"], "fixture"), default)) { }
+        Assert.DoesNotContain(handler.Calls, c => c.Contains("currentPage=2", StringComparison.Ordinal));
+    }
 }

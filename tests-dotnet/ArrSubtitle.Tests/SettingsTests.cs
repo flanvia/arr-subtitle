@@ -9,6 +9,17 @@ namespace ArrSubtitle.Tests;
 public sealed class SettingsTests
 {
     [Fact]
+    public void ReadableJsonKeepsKoreanAndJapaneseWithoutRemovingHtmlEscaping()
+    {
+        var settings = new CollectorSettings { Mappings = [new("여친, 빌리겠습니다", 1, 1, ["彼女、お借りします", "<script>"])] };
+        var json = JsonSerializer.Serialize(settings, CollectorJsonContext.Readable.CollectorSettings);
+        Assert.Contains("여친, 빌리겠습니다", json);
+        Assert.Contains("彼女、お借りします", json);
+        Assert.DoesNotContain("<script>", json);
+        Assert.Equal(settings.Mappings[0].Title, JsonSerializer.Deserialize(json, CollectorJsonContext.Readable.CollectorSettings)!.Mappings[0].Title);
+    }
+
+    [Fact]
     public void EmptyObjectPreservesSettingsDefaults()
     {
         var settings = JsonSerializer.Deserialize("{}", CollectorJsonContext.Default.CollectorSettings)!;

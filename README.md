@@ -26,7 +26,7 @@ Anissia와 자막 제작자 블로그에서 한국어 애니메이션 자막을 
 
 [Releases](https://github.com/flanvia/arr-subtitle/releases)에서 OS와 CPU에 맞는 압축 파일을 받는다. macOS 파일명에는 `darwin`, Windows에는 `windows`를 사용한다. .NET의 RID에서는 각각 `osx`, `win`이다. `SHA256SUMS`로 파일 무결성을 확인할 수 있다.
 
-.NET 런타임을 별도로 설치할 필요는 없다. Linux 바이너리는 glibc 기반이며 Alpine의 musl은 대상이 아니다. TLS 및 국제화 관련 OS 라이브러리는 필요할 수 있다. macOS와 Windows 바이너리는 개발자 인증서로 서명하지 않는다. 각 대상의 실제 테스트 및 NativeAOT smoke 결과는 [Actions](https://github.com/flanvia/arr-subtitle/actions)에서 확인한다.
+.NET 런타임을 별도로 설치할 필요는 없다. Linux 바이너리는 glibc 기반이며 Alpine의 musl은 대상이 아니다. Linux TLS에는 고정 OpenSSL 3.5.9를 정적으로 포함하므로 시스템의 libssl 3 설치나 환경 변수 설정이 필요 없다. OpenSSL 4 환경에서도 같은 바이너리를 사용한다. 국제화 관련 OS 라이브러리와 시스템 CA 인증서는 필요하다. macOS와 Windows는 OS TLS를 사용하며 배포물은 개발자 인증서로 서명하지 않는다. 각 대상의 실제 테스트 및 NativeAOT smoke 결과는 [Actions](https://github.com/flanvia/arr-subtitle/actions)에서 확인한다.
 
 ## 실행
 
@@ -51,6 +51,8 @@ Windows PowerShell:
 전체 명령과 설정은 [CLI 사용법](docs/cli.md)을 참고한다.
 
 `search`는 검색어와 관련된 작품들의 자막을 과거 회차까지 나열한다. 최신 링크에서 멈추지 않으며 제작자와 등록 블로그를 모두 조사한다. 중간 회차 누락이나 조사 실패는 결과에 표시하고 실패 종료한다. 자세한 완전성 기준은 [전체 검색](docs/search.md)에 있다.
+
+검색은 기본 60초 제한이며 `search 'Working' --timeout 120`으로 변경할 수 있다. 진행 상황과 발견 회차는 즉시 stderr로 출력한다. 취소하거나 시간이 끝나면 발견한 부분 결과와 미완료 출처를 반환한다.
 
 ## 개발
 
