@@ -25,7 +25,7 @@ class CliTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         self.config = self.root / "config.json"
         update_settings(self.config, Settings(anilist_enabled=False), "missing")
         self.output = io.StringIO()

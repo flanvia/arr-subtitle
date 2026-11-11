@@ -5,6 +5,7 @@ import json
 import os
 import tempfile
 import threading
+import types
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -20,7 +21,7 @@ class StorageTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         self.media = self.root / "Example - 01.mkv"
         self.media.write_bytes(b"video")
         self.target = {"episode": "1", "mediaPath": str(self.media)}
@@ -182,6 +183,31 @@ class StorageTests(unittest.TestCase):
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             results = list(executor.map(lambda _: update(), range(2)))
         self.assertCountEqual(["updated", "conflict"], results)
+
+    def test_windows_lock_initializes_only_after_acquisition(self):
+        state = {"locked": False, "attempts": 0}
+        def locking(fd, mode, size):
+            self.assertEqual(1, size)
+            if mode == 1:
+                state["attempts"] += 1
+                if state["attempts"] == 1:
+                    raise PermissionError("Lock is held by another process")
+                state["locked"] = True
+            else:
+                state["locked"] = False
+        original_write = os.write
+        def write(fd, data):
+            self.assertTrue(state["locked"], "Lock initialization must hold the byte-range lock")
+            return original_write(fd, data)
+        windows_os = types.SimpleNamespace(**{**vars(os), "name": "nt", "write": write})
+        msvcrt = types.SimpleNamespace(locking=locking, LK_NBLCK=1, LK_UNLCK=2)
+        budget = Budget()
+        with patch("arr_subtitle.storage.os", windows_os), patch.dict("sys.modules", {"msvcrt": msvcrt}), patch.object(budget, "wait"):
+            with storage._settings_lock(self.root / "settings.json", budget):
+                self.assertTrue(state["locked"])
+        self.assertFalse(state["locked"])
+        self.assertEqual(2, state["attempts"])
+        self.assertEqual(b"\0", (self.root / "settings.json.lock").read_bytes())
 
     def test_oversized_settings_are_rejected(self):
         path = self.root / "settings.json"

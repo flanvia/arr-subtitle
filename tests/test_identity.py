@@ -94,7 +94,7 @@ class PathTests(unittest.TestCase):
         self.assertEqual("Working", query["title"])
         self.assertEqual("Working'!!", query["fileTitle"])
         self.assertEqual(2, query["season"])
-        self.assertEqual("/media/Working", query["libraryPath"])
+        self.assertEqual(str(Path("/media/Working").absolute()), query["libraryPath"])
         self.assertEqual("1", number)
 
     def test_bare_episode_uses_folders(self):
@@ -135,7 +135,7 @@ class PathTests(unittest.TestCase):
 
     def test_rejects_symlink_media_ancestors(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
+            root = Path(temporary).resolve()
             (root / "real").mkdir()
             (root / "link").symlink_to(root / "real", target_is_directory=True)
             with self.assertRaises(CollectorError):
@@ -314,7 +314,7 @@ class LocalEvidenceTests(unittest.TestCase):
 
     def test_nfo_season_conflict_is_rejected_before_network(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
+            root = Path(temporary).resolve()
             (root / "tvshow.nfo").write_text("<tvshow><title>Other</title><season>2</season><uniqueid type='anissia'>99</uniqueid></tvshow>")
             with self.assertRaises(CollectorError) as error:
                 self.resolve(root)
@@ -324,28 +324,28 @@ class LocalEvidenceTests(unittest.TestCase):
         for contents in ("<tvshow><title>Other</title></tvshow>",
                          "<tvshow><title>Test</title><uniqueid type='anissia'>99</uniqueid></tvshow>"):
             with tempfile.TemporaryDirectory() as temporary:
-                root = Path(temporary)
+                root = Path(temporary).resolve()
                 (root / "tvshow.nfo").write_text(contents)
                 with self.subTest(contents=contents), self.assertRaises(CollectorError):
                     self.resolve(root, animeId=1)
 
     def test_episode_nfo_uses_showtitle_not_episode_title(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
+            root = Path(temporary).resolve()
             media = root / "Test - 01.mkv"
             media.with_suffix(".nfo").write_text("<episodedetails><title>First episode</title><showtitle>Test</showtitle><season>1</season></episodedetails>")
             self.assertEqual(1, self.resolve(root, mediaPath=str(media)).anime_id)
 
     def test_external_provider_ids_are_not_anissia_ids(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
+            root = Path(temporary).resolve()
             (root / "tvshow.nfo").write_text("<tvshow><title>Test</title><uniqueid type='tvdb'>99</uniqueid><id>12345</id></tvshow>")
             (root / "metadata.json").write_text(json.dumps({"title": "Test", "ProviderIds": {"Tvdb": "999", "Imdb": "tt123"}}))
             self.assertEqual(1, self.resolve(root).anime_id)
 
     def test_local_anissia_id_can_supply_identity_without_title_search(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
+            root = Path(temporary).resolve()
             (root / "metadata.json").write_text(json.dumps({"title": "Test", "ProviderIds": {"Anissia": "1"}}))
             session = ResolverTests().session()
             result = Resolver(session, Settings(False)).resolve({"libraryPath": str(root)}, Budget())
@@ -359,7 +359,7 @@ class LocalEvidenceTests(unittest.TestCase):
         values.append(values[0].decode().encode("utf-16"))
         for value in values:
             with tempfile.TemporaryDirectory() as temporary:
-                root = Path(temporary)
+                root = Path(temporary).resolve()
                 (root / "tvshow.nfo").write_bytes(value)
                 with self.subTest(value=value[:40]), self.assertRaises(CollectorError):
                     self.resolve(root)
@@ -367,14 +367,14 @@ class LocalEvidenceTests(unittest.TestCase):
     def test_json_depth_and_size_are_bounded(self):
         for data in (b" " * (1024 * 1024 + 1), ("{\"x\":" * 17 + "{}" + "}" * 17).encode()):
             with tempfile.TemporaryDirectory() as temporary:
-                root = Path(temporary)
+                root = Path(temporary).resolve()
                 (root / "metadata.json").write_bytes(data)
                 with self.assertRaises(CollectorError):
                     self.resolve(root)
 
     def test_symlink_metadata_and_ancestors_are_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
+            root = Path(temporary).resolve()
             (root / "outside.json").write_text('{"title":"Test"}')
             (root / "metadata.json").symlink_to(root / "outside.json")
             with self.assertRaises(CollectorError):

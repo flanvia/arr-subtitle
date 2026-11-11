@@ -240,8 +240,6 @@ def _settings_lock(path, budget):
                 raise OSError("Invalid settings lock")
             if os.name == "nt":
                 import msvcrt
-                if os.fstat(fd).st_size == 0:
-                    os.write(fd, b"\0")
                 def acquire():
                     os.lseek(fd, 0, os.SEEK_SET)
                     msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
@@ -262,6 +260,8 @@ def _settings_lock(path, budget):
                 except (BlockingIOError, PermissionError):
                     budget.wait(0.05)
             try:
+                if os.name == "nt" and os.fstat(fd).st_size == 0:
+                    os.write(fd, b"\0")
                 yield
             finally:
                 release()

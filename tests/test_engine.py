@@ -73,7 +73,7 @@ class EngineTests(unittest.TestCase):
     def test_collection_preserves_duplicate_episode_video_paths(self):
         transport, calls = fixture()
         with tempfile.TemporaryDirectory() as directory, Session(transport, interval=0) as session:
-            paths = [str(Path(directory) / name) for name in ("Series - 01.mkv", "Series - 01 alternate.mkv")]
+            paths = [str(Path(directory).resolve() / name) for name in ("Series - 01.mkv", "Series - 01 alternate.mkv")]
             targets = [{"episode": "1", "mediaPath": path} for path in paths]
             result = Engine(session, self.settings()).collect({"animeId": 1}, targets, "", Budget())
             self.assertTrue(result["success"], result)
@@ -147,6 +147,7 @@ class EngineTests(unittest.TestCase):
                 raise AssertionError(url)
             return Response(url, json.dumps(value).encode())
         with tempfile.TemporaryDirectory() as root, Session(transport, interval=0) as session:
+            root = str(Path(root).resolve())
             mapping = Mapping("Series", 2, 1, (), root, 12)
             settings = Settings(False, self.settings().blogs, (mapping,))
             report = Engine(session, settings).collect({"title": "Series", "season": 2, "libraryPath": root}, [{"episode": "1"}], root, Budget(), search_only=True)
@@ -156,6 +157,7 @@ class EngineTests(unittest.TestCase):
     def test_mapping_does_not_bypass_each_file_metadata_conflict(self):
         transport, _ = fixture()
         with tempfile.TemporaryDirectory() as root, Session(transport, interval=0) as session:
+            root = str(Path(root).resolve())
             path = Path(root) / "Series - 01.mkv"
             path.with_suffix(".json").write_text('{"animeId":999,"title":"Other"}', encoding="utf-8")
             settings = Settings(False, self.settings().blogs, (Mapping("Series", 1, 1, (), root),))

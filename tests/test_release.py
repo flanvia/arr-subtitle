@@ -69,7 +69,8 @@ class ReleaseTests(unittest.TestCase):
                 else:
                     with tarfile.open(archive) as handle:
                         names = handle.getnames()
-                        self.assertEqual(handle.getmember("arr-subtitle/arr-subtitle").mode & 0o111, 0o111)
+                        if os.name != "nt":
+                            self.assertEqual(handle.getmember("arr-subtitle/arr-subtitle").mode & 0o111, 0o111)
                 for name in ("LICENSE", "README.md", "config.example.json"):
                     self.assertIn("arr-subtitle/" + name, names)
                 self.assertIn("arr-subtitle/_internal/libpython.so", names)

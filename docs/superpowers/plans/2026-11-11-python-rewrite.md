@@ -114,3 +114,4 @@
 - Windows의 악의적인 동시 junction 교체를 kernel handle로 방어하는 것은 구현하지 않았다. 경로 재검사와 no-clobber는 유지하며 실제 Windows 동작은 CI로 검증한다. 공격자가 쓰기 권한을 가진 부모 디렉터리를 실행 중 교체하는 환경에서는 경로 보호가 완전하지 않을 수 있다.
 - C# 제거는 6개 대상 Python 배포 동등성 결과를 확인한 뒤 수행한다. 로컬 Linux 결과만으로 원래 코드를 제거하지 않는다.
 - 첫 CI는 YAML의 colon-containing plain command 때문에 job 시작 전 실패했다. block scalar로 수정하고 원격 검사를 다시 시작했다.
+- 원격 Windows x64 및 ARM64에서 frozen 도움말의 한국어가 CP1252 stdout에 기록되지 않는 실패를 확인했다. 실행 진입점의 stdout과 stderr를 UTF-8로 설정하고 회귀 테스트를 추가했다. 수정 후 두 Windows 네이티브 smoke가 통과했다. 전체 Python 테스트도 6개 네이티브 러너에서 실행하도록 확장했다.

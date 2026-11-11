@@ -29,7 +29,7 @@ class BatchTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
 
     def video(self, title, filename):
         path = self.root / title / "Season 1" / filename
