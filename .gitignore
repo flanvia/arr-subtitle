@@ -8,3 +8,10 @@ config.json
 *.user
 *.suo
 .DS_Store
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.superpowers/

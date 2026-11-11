@@ -1,0 +1,226 @@
+name: Python
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  PYTHONUTF8: '1'
+  PYTHONPATH: src
+
+jobs:
+  unit:
+    name: Python ${{ matrix.python }} unit and plugin isolation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install locked runtime dependencies
+        run: python -m pip install --require-hashes --only-binary=:all: -r requirements.txt
+      - name: Run unit and isolated plugin tests
+        run: python -m unittest discover -s tests -v
+      - name: Build standalone plugin
+        run: python scripts/build_plugin.py
+      - name: Verify built plugin isolation
+        run: python -m unittest discover -s tests -p test_bundle.py -v
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: LavX/bazarr-provider-catalog
+          ref: 57b93e69c760feab1ed7ae0126e4a84916cbf57e
+          path: artifacts/upstream-catalog
+          persist-credentials: false
+      - name: Fetch pinned Provider Hub worker
+        run: |
+          python - <<'PY'
+          import pathlib
+          import urllib.request
+          from scripts.check_provider_sdk import HOST_REVISION
+          url = f'https://raw.githubusercontent.com/LavX/bazarr/{HOST_REVISION}/bazarr/provider_hub/worker_runner.py'
+          with urllib.request.urlopen(url, timeout=30) as response:
+              data = response.read(1024 * 1024 + 1)
+          if not data or len(data) > 1024 * 1024:
+              raise ValueError('Invalid upstream worker response size')
+          compile(data, url, 'exec')
+          pathlib.Path('artifacts/upstream-worker.py').write_bytes(data)
+          PY
+      - name: Validate pinned SDK and isolated upstream worker
+        run: python scripts/check_provider_sdk.py artifacts/upstream-catalog artifacts/plugin/providers/arr_subtitle artifacts/upstream-worker.py
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: matrix.python == '3.14'
+        with:
+          name: python-plugin
+          path: artifacts/plugin/arr-subtitle-bazarr-plus-*.zip
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: matrix.python == '3.14'
+        with:
+          name: catalog-source
+          path: |
+            artifacts/plugin/providers/
+            artifacts/plugin/catalog.json
+          if-no-files-found: error
+          retention-days: 14
+
+  native:
+    name: Native ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            runner: ubuntu-24.04
+            architecture: x64
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+            architecture: arm64
+          - target: darwin-x64
+            runner: macos-15-intel
+            architecture: x64
+          - target: darwin-arm64
+            runner: macos-15
+            architecture: arm64
+          - target: windows-x64
+            runner: windows-2025
+            architecture: x64
+          - target: windows-arm64
+            runner: windows-11-arm
+            architecture: arm64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.14.10'
+          architecture: ${{ matrix.architecture }}
+      - name: Install locked native wheels
+        run: python -m pip install --require-hashes --only-binary=:all: -r requirements-build.txt
+      - name: Validate native runner and Python version
+        env:
+          EXPECTED_TARGET: ${{ matrix.target }}
+        run: python -c "import os, platform; from scripts.build_release import BUILD_PYTHON, native_target; assert platform.python_version() == BUILD_PYTHON; assert native_target() == os.environ['EXPECTED_TARGET']"
+      - name: Build, unpack and smoke-test native bundles
+        run: python scripts/build_release.py
+      - name: Create local TLS fixture
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p artifacts/tls
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -keyout artifacts/tls/key.pem -out artifacts/tls/cert.pem -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost'
+          chmod 644 artifacts/tls/key.pem
+      - name: Verify runtime and TLS without host Python, .NET or OpenSSL
+        if: runner.os == 'Linux'
+        run: |
+          docker run --rm --network none \
+            -v "$PWD/artifacts/python-release/cli/arr-subtitle:/app:ro" \
+            -v "$PWD/artifacts/python-release/smoke/arr-subtitle-smoke:/smoke:ro" \
+            -v "$PWD/artifacts/tls:/tls:ro" \
+            ubuntu:24.04 sh -ec '
+              ! command -v python
+              ! command -v python3
+              ! command -v dotnet
+              mkdir /unavailable-openssl
+              ldconfig -p | awk "/lib(ssl|crypto)\\.so/ {print \$NF}" | sort -u | while read -r library; do
+                mv "$library" /unavailable-openssl/
+              done
+              ldconfig
+              ! ldconfig -p | grep -E "libssl|libcrypto"
+              unset PYTHONHOME PYTHONPATH PYTHONSTARTUP LD_LIBRARY_PATH
+              /app/arr-subtitle --help
+              /app/arr-subtitle --version
+              /smoke/arr-subtitle-smoke
+              /smoke/arr-subtitle-smoke --tls /tls/cert.pem /tls/key.pem
+            '
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: python-cli-${{ matrix.target }}
+          path: |
+            artifacts/python-release/arr-subtitle-*.tar.gz
+            artifacts/python-release/arr-subtitle-*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish Python release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [unit, native]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify release tag
+        env:
+          TAG: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git check-ref-format "refs/tags/$TAG"
+          git merge-base --is-ancestor HEAD "origin/$DEFAULT_BRANCH"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: python-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: catalog-source
+          path: artifacts/catalog-source
+      - name: Validate seven assets and create checksums
+        run: |
+          python - <<'PY'
+          import hashlib
+          import pathlib
+          import tomllib
+          version = tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version']
+          expected = {f'arr-subtitle-{os}-{cpu}' + ('.zip' if os == 'windows' else '.tar.gz') for os in ('linux', 'darwin', 'windows') for cpu in ('x64', 'arm64')}
+          expected.add(f'arr-subtitle-bazarr-plus-{version}.zip')
+          root = pathlib.Path('dist')
+          assert {path.name for path in root.iterdir()} == expected, 'Release assets do not match seven expected bundles'
+          lines = [f'{hashlib.file_digest((root / name).open("rb"), "sha256").hexdigest()}  {name}\n' for name in sorted(expected)]
+          (root / 'SHA256SUMS').write_text(''.join(lines), encoding='ascii')
+          PY
+          cd dist
+          sha256sum -c SHA256SUMS
+      - name: Publish checked artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          cd dist
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --draft --title "$TAG" --generate-notes
+          fi
+          gh release upload "$TAG" arr-subtitle-* SHA256SUMS --clobber
+          gh release edit "$TAG" --draft=false
+      - name: Publish immutable community provider catalog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: python3 scripts/publish_catalog.py artifacts/catalog-source --repo "$GH_REPO" --version "$TAG"

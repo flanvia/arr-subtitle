@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arr-subtitle"
+version = "0.2.0"
+description = "Korean anime subtitle collector and Bazarr+ provider"
+requires-python = ">=3.12,<3.15"
+dependencies = ["beautifulsoup4==4.14.3"]
+
+[project.scripts]
+arr-subtitle = "arr_subtitle.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["arr_subtitle*"]

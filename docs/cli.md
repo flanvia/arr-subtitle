@@ -1,22 +1,19 @@
-# C# CLI
+# Python CLI
 
 ## 빌드 및 실행
 
-.NET SDK는 `global.json`의 버전을 사용한다. NativeAOT 게시에는 C 컴파일러 및 링크 도구와 플랫폼 개발 라이브러리가 필요하다.
+독립 CLI 배포물은 Python 런타임과 Core를 포함한다. 압축을 푼 디렉터리를 유지하고 그 안의 실행 파일을 호출한다. 소스 실행은 Python 3.12~3.14의 가상환경을 사용한다.
 
 ```sh
-dotnet build ArrSubtitle.slnx -c Release
-dotnet test tests-dotnet/ArrSubtitle.Tests -c Release
-sh scripts/build-openssl.sh "$PWD/artifacts/openssl"
-export OPENSSL_ROOT_DIR="$PWD/artifacts/openssl"
-export PKG_CONFIG_PATH="$OPENSSL_ROOT_DIR/lib/pkgconfig"
-export LIBRARY_PATH="$OPENSSL_ROOT_DIR/lib"
-dotnet publish src/ArrSubtitle.Cli -c Release -r linux-x64 -o artifacts/linux-x64
+python3 -m venv .venv
+.venv/bin/python -m pip install --require-hashes -r requirements.txt
+PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
+PYTHONPATH=src .venv/bin/python -m arr_subtitle --help
 ```
 
-Linux, macOS 및 Windows의 x64와 ARM64를 지원 대상으로 한다. .NET RID는 `linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`, `win-x64`, `win-arm64`다. 각 OS와 CPU의 러너에서 NativeAOT 게시와 실행을 검증한다.
+Linux, macOS 및 Windows의 x64와 ARM64를 지원 대상으로 한다. 배포 이름은 `linux-x64`, `linux-arm64`, `darwin-x64`, `darwin-arm64`, `windows-x64`, `windows-arm64`다. 각 OS와 CPU의 러너에서 PyInstaller 빌드와 실제 실행을 검증한다.
 
-Linux에는 clang, cmake, make, perl 및 개발 라이브러리, macOS에는 Xcode Command Line Tools, Windows에는 해당 아키텍처용 Visual C++ 도구가 필요하다. 위 OpenSSL 빌드 단계는 Linux에서만 수행한다. 게시된 Linux 바이너리는 OpenSSL 3.5.9를 정적으로 포함하므로 실행할 때 libssl 설치와 `LD_LIBRARY_PATH`가 필요 없다. SDK 자체 실행에 필요한 라이브러리는 별도다. 게시물은 완전 정적 바이너리가 아니며 시스템 CA와 국제화 라이브러리는 필요하다. macOS 및 Windows 배포물은 개발자 인증서로 서명하지 않는다.
+CLI 패키징은 `requirements-build.txt`를 설치하고 `scripts/build_release.py`를 실행한다. Python과 TLS 라이브러리를 포함하지만 완전 정적 바이너리는 아니다. Linux는 시스템 CA와 glibc가 필요하다. 인증서 검증을 비활성화하지 않는다. macOS 및 Windows 배포물은 개발자 인증서로 서명하지 않는다.
 
 ## 영상 기반
 
@@ -34,9 +31,13 @@ arr-subtitle search 'Working' --timeout 30 --json
 artifacts/linux-x64/arr-subtitle match '/media/Kyouran Reijou Nia Liston/Season 1/Kyouran Reijou Nia Liston - 05.mkv'
 artifacts/linux-x64/arr-subtitle download '/media/Kyouran Reijou Nia Liston/Season 1/Kyouran Reijou Nia Liston - 05.mkv'
 artifacts/linux-x64/arr-subtitle scan '/media/anime'
+arr-subtitle '/media/anime'
+arr-subtitle download '/media/anime/작품/Season 1'
 ```
 
 `match`는 게시물과 첨부 후보를 찾는다. 다운로드 내용 검증과 실제 영상의 싱크를 보장하지 않는다. `download`는 자막 내용을 검증한 뒤 영상 옆에 저장한다. 원본 영상은 변경하지 않는다. 검색 및 다운로드는 파일명 경로로 동작할 수 있으므로 가짜 영상을 만들 필요가 없다.
+
+경로만 입력하면 파일 또는 폴더의 다운로드로 처리한다. 폴더는 재귀 탐색하며 `.mkv`, `.mp4`, `.avi`를 지원한다. 요청은 작품과 시즌별로 묶고 최대 4개 네트워크 요청으로 병렬 처리한다. 같은 회차의 영상이 여러 개이면 각각의 영상 옆에 자막을 저장한다. symlink와 junction은 따라가지 않는다. 실패한 파일은 보고하고 다른 파일 작업을 계속한다.
 
 기본 경로는 `작품/Season 2/영상.mkv`다. 영문과 로마자는 AniList 원제와 Anissia를 연결한다. 작품이나 시즌이 모호하면 작품 번호 또는 설정 매핑을 요구한다. `Working!!`, `Working'!!`, `Working!!!`를 같은 문자열로 합치지 않는다. 라이브러리 시즌과 작품 DB의 구분이 항상 같지 않으므로 근거 없는 시즌 대응은 자동 선택하지 않는다.
 
@@ -48,6 +49,8 @@ artifacts/linux-x64/arr-subtitle collect 'Kyouran Reijou Nia Liston' --season 1 
 ```
 
 요청 회차를 명시해야 한다. 블로그에서 발견한 마지막 회차를 전체 화수로 간주하지 않는다. 소수 회차는 `12.5`로 지정한다. 요청 범위는 최대 1000개다.
+
+`collect`는 `작품명 [anissia-3433] - 01.ko.srt` 형식으로 저장한다. 시즌이 있으면 출력 폴더 아래 `Season 1` 같은 하위 폴더를 사용한다. 파일명에서 금지 문자를 바꾸거나 긴 제목을 줄여도 다른 작품의 자막과 충돌하지 않도록 Anissia ID를 항상 포함한다. 영상 경로를 사용하는 `download`와 `scan`은 기존처럼 영상 stem에 `.ko.<확장자>`를 붙인다.
 
 ## 전역 fallback 블로그
 
@@ -99,10 +102,12 @@ artifacts/linux-x64/arr-subtitle blogs remove https://bluewater91.blogspot.com/
 
 `NotFound`는 허용 출처를 조사했지만 못 찾은 경우다. 접속 실패나 페이지 상한으로 끝내지 못했으면 `SearchIncomplete`다. 일부 성공 파일은 보존한다. 기존 유효한 `.ko` 및 `.kor` sidecar는 덮어쓰지 않는다.
 
+`collect`, `download`와 폴더 수집의 성공은 요청한 영상의 자막 확보를 뜻한다. 모든 제작자 블로그를 끝까지 조사했다는 뜻은 아니다. 이미 유효한 자막이 있으면 외부 탐색 없이 보존할 수 있다. 전체 출처 탐색과 과거 회차 누락 확인은 `search`의 `complete`와 출처별 결과를 사용한다.
+
 ## 현재 제한
 
 - 실제 Jellyfin 인식 및 영상 싱크는 검증하지 않았다.
-- Sonarr Custom Script 및 Bazarr provider 어댑터, HTTP 서버와 상시 감시는 아직 없다.
+- Bazarr+ 플러그인은 별도 ZIP으로 배포한다. 공식 Bazarr 어댑터, Sonarr Custom Script, HTTP 서버와 상시 감시는 없다.
 - 로그인, CAPTCHA, JavaScript 실행은 지원하지 않는다.
 - RAR, 7z와 중첩 압축은 지원하지 않는다.
 - 네이버는 HTTP 목록과 본문 wrapper 기반이다. 플랫폼 구조가 바뀌거나 목록 접근이 제한되면 탐색 미완료로 반환한다.

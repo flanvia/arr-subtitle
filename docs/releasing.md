@@ -1,5 +1,15 @@
 # 독립 저장소와 CI/CD
 
+## Python v0.2 배포
+
+현재 배포 workflow는 `.github/workflows/python.yml`이다. Python 3.12~3.14 테스트와 Bazarr+ 독립 패키지 검증, 6개 OS 및 CPU의 PyInstaller 빌드가 모두 통과해야 태그 Release를 공개한다. 플러그인 ZIP 하나와 CLI 압축 파일 6개, `SHA256SUMS`를 제공한다.
+
+CLI는 onedir 형태로 Python과 의존성을 포함한다. Linux 및 macOS는 tar.gz, Windows는 ZIP이다. 플랫폼별 실제 실행과 TLS 정상 및 잘못된 인증서 거부를 확인한다. Linux의 별도 컨테이너 검사에서는 호스트 Python과 .NET을 사용하지 않는다.
+
+플러그인은 `scripts/build_plugin.py`가 Core와 어댑터를 복사하고 manifest의 파일 및 bundle SHA-256을 생성한다. 고정 upstream SDK 및 worker와 격리 실행을 검사한다. 로컬 ZIP 설치에는 CLI가 필요 없다. 커뮤니티 카탈로그의 원격 설치는 manifest가 가리키는 commit과 경로에 실제 Python 파일이 게시되어야 하므로 Release ZIP 공개만으로 충족된 것으로 처리하지 않는다.
+
+기존 C# workflow `build.yml`은 수동 검사만 가능하며 Release 공개는 비활성화했다. Python의 전체 검사 조건을 우회해 C# 자산으로 v0.2 Release가 먼저 공개되는 것을 막는다. 아래 내용은 v0.1 배포의 기록이다.
+
 ## 범위
 
 저장소는 `flanvia/arr-subtitle`이며 public이다. 원본 Python 저장소의 Git 이력, Python 코드, 가상 환경과 다운로드 데이터는 포함하지 않는다. 기존 작업 폴더도 변경하지 않는다.
