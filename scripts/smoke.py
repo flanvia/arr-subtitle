@@ -174,6 +174,9 @@ def smoke_tls(certificate, key):
 
 
 def main():
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="strict")
     parser = argparse.ArgumentParser()
     parser.add_argument("--tls", nargs=2, metavar=("CERTIFICATE", "KEY"), type=Path)
     arguments = parser.parse_args()

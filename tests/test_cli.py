@@ -14,6 +14,14 @@ from arr_subtitle.storage import load_settings, update_settings
 
 
 class CliTests(unittest.TestCase):
+    def test_main_writes_utf8_when_output_is_redirected(self):
+        data = io.BytesIO()
+        stream = io.TextIOWrapper(data, encoding="cp1252")
+        with patch.object(cli.sys, "stdout", stream), patch.object(cli.sys, "stderr", io.StringIO()):
+            self.assertEqual(cli.main(["--help"]), 0)
+            stream.flush()
+            self.assertIn("애니메이션", data.getvalue().decode("utf-8"))
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
