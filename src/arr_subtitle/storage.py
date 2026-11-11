@@ -234,7 +234,19 @@ def load_settings(path):
 @contextlib.contextmanager
 def _settings_lock(path, budget):
     with _parent(str(path) + ".lock", create=True) as (lock, directory):
-        fd = os.open(lock.name if directory is not None else lock, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600, dir_fd=directory)
+        name = lock.name if directory is not None else lock
+        flags = os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
+        while True:
+            budget.check()
+            try:
+                fd = os.open(name, flags | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=directory)
+                break
+            except FileExistsError:
+                try:
+                    fd = os.open(name, flags, dir_fd=directory)
+                    break
+                except FileNotFoundError:
+                    budget.wait(0.01)
         try:
             if not stat.S_ISREG(os.fstat(fd).st_mode):
                 raise OSError("Invalid settings lock")

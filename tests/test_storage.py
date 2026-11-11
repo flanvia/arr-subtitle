@@ -77,6 +77,21 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(SRT, self.media.with_suffix(".ko.srt").read_bytes())
         self.assertFalse(list(self.root.glob("*.tmp")))
 
+    def test_lock_creation_retries_when_existing_entry_disappears(self):
+        original = os.open
+        attempts = []
+        def interrupted(path, flags, *args, **kwargs):
+            if str(path).endswith(".lock") and len(attempts) < 2:
+                attempts.append(flags)
+                if len(attempts) == 1:
+                    raise FileExistsError("Concurrent creator")
+                raise FileNotFoundError("Concurrent removal")
+            return original(path, flags, *args, **kwargs)
+        with patch("arr_subtitle.storage.os.open", side_effect=interrupted):
+            self.assertEqual(self.save()["status"], "Downloaded")
+        self.assertTrue(attempts[0] & os.O_EXCL)
+        self.assertFalse(attempts[1] & os.O_CREAT)
+
     def test_atomic_write_never_overwrites_destination(self):
         destination = self.root / "file.json"
         destination.write_bytes(b"original")

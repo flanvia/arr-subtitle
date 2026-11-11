@@ -141,29 +141,48 @@ class NetworkTests(unittest.TestCase):
         self.assertFalse(session._cache)
 
     def test_cancellation_interrupts_tls_handshake(self):
-        handshake_started = threading.Event()
-        context = Mock()
+        for shared_descriptor in (False, True):
+            with self.subTest(shared_descriptor=shared_descriptor):
+                handshake_started, interrupted, release = (threading.Event() for _ in range(3))
+                closed = threading.Event()
+                context, raw, tls = Mock(), Mock(), Mock()
 
-        def serve(server):
-            self.assertEqual(server.recv(1), b"")
+                def shutdown(how):
+                    self.assertEqual(how, socket.SHUT_RDWR)
+                    if shared_descriptor and closed.is_set():
+                        raise OSError("Descriptor already closed")
+                    interrupted.set()
+                    release.set()
 
-        session, client = self.socket_session(serve, context=context)
-        tls = Mock(wraps=client)
+                def handshake():
+                    handshake_started.set()
+                    if not release.wait(2):
+                        raise TimeoutError("Handshake was not interrupted")
+                    raise OSError("Handshake interrupted")
 
-        def handshake():
-            handshake_started.set()
-            client.recv(1)
-
-        tls.do_handshake = handshake
-        context.wrap_socket.return_value = tls
-        budget = Budget()
-        with concurrent.futures.ThreadPoolExecutor(1) as pool:
-            future = pool.submit(session.get, "https://example.com/", budget)
-            self.assertTrue(handshake_started.wait(1))
-            budget.cancel.set()
-            with self.assertRaises(Cancelled):
-                future.result(timeout=1)
-        self.assertEqual(context.wrap_socket.call_args.kwargs, {"server_hostname": "example.com", "do_handshake_on_connect": False})
+                raw.close.side_effect = closed.set
+                tls.shutdown.side_effect = shutdown
+                tls.do_handshake.side_effect = handshake
+                context.wrap_socket.return_value = tls
+                budget = Budget()
+                with Session(interval=0) as session:
+                    session._resolve = lambda *args: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))]
+                    with patch("arr_subtitle.network.socket.socket", return_value=raw), patch("arr_subtitle.network.ssl.create_default_context", return_value=context), concurrent.futures.ThreadPoolExecutor(1) as pool:
+                        future = pool.submit(session.get, "https://example.com/", budget)
+                        try:
+                            self.assertTrue(handshake_started.wait(1))
+                            budget.cancel.set()
+                            with self.assertRaises(Cancelled):
+                                future.result(timeout=1)
+                        finally:
+                            release.set()
+                    self.assertTrue(interrupted.is_set())
+                    self.assertFalse(session._pending)
+                    self.assertFalse(session._cache)
+                    self.assertEqual(session._active_bytes, 0)
+                raw.shutdown.assert_called_once_with(socket.SHUT_RDWR)
+                tls.shutdown.assert_called_once_with(socket.SHUT_RDWR)
+                self.assertEqual(context.wrap_socket.call_args.kwargs, {"server_hostname": "example.com", "do_handshake_on_connect": False})
 
     def test_tls_certificate_failure_is_not_retried_without_verification(self):
         context = Mock()

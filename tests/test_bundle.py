@@ -88,7 +88,7 @@ sys.addaudithook(deny_source)
 import provider
 import arr_subtitle
 from arr_subtitle.network import Session, Response
-assert Path(arr_subtitle.__file__).resolve().is_relative_to(Path(sys.argv[1]))
+assert Path(arr_subtitle.__file__).resolve().is_relative_to(Path(sys.argv[1]).resolve())
 assert 'arr_subtitle.cli' not in sys.modules
 assert 'arr_subtitle.batch' not in sys.modules
 """ + f"\nSAMI = {SAMI!r}\n" + inspect.getsource(fixture_transport) + """

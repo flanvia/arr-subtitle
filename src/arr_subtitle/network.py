@@ -284,6 +284,8 @@ class Session:
                                 sock.shutdown(socket.SHUT_RDWR)
                             except OSError:
                                 pass
+                        # Wake every reader before closing potentially shared descriptors.
+                        for sock in sockets:
                             sock.close()
                     return
 
