@@ -8,7 +8,7 @@ CLI는 onedir 형태로 Python과 의존성을 포함한다. Linux 및 macOS는 
 
 플러그인은 `scripts/build_plugin.py`가 Core와 어댑터를 복사하고 manifest의 파일 및 bundle SHA-256을 생성한다. 고정 upstream SDK 및 worker와 격리 실행을 검사한다. 로컬 ZIP 설치에는 CLI가 필요 없다. 커뮤니티 카탈로그의 원격 설치는 manifest가 가리키는 commit과 경로에 실제 Python 파일이 게시되어야 하므로 Release ZIP 공개만으로 충족된 것으로 처리하지 않는다.
 
-기존 C# workflow `build.yml`은 수동 검사만 가능하며 Release 공개는 비활성화했다. Python의 전체 검사 조건을 우회해 C# 자산으로 v0.2 Release가 먼저 공개되는 것을 막는다. 아래 내용은 v0.1 배포의 기록이다.
+기존 C# workflow와 제품 코드는 Python의 6개 대상 검증 후 제거했다. 아래 내용은 v0.1 배포의 기록이며 현재 빌드 절차가 아니다.
 
 ## 범위
 

@@ -89,10 +89,10 @@
 ## Task 7: 6개 CLI 배포와 전환
 
 - [x] scripts/build_release.py 및 PyInstaller 설정, Python 3.12~3.14 테스트와 6개 네이티브 빌드 workflow.
-- [ ] 아카이브 단독 smoke, TLS 정상 및 잘못된 인증서 거부, Python 및 .NET 없는 환경 확인.
+- [x] 아카이브 단독 smoke, TLS 정상 및 잘못된 인증서 거부, Python 및 .NET 없는 환경 확인.
 - [x] README 및 CLI, 검색, 플러그인 설치 문서 갱신. 기존 설정 호환 문서화.
 - [x] C# 동작 조건 대응과 Python 전체 회귀, 별도 전체 변경 리뷰 및 수정.
-- [ ] 검증 후에만 C# 제품 코드와 전용 빌드 구성 제거.
+- [x] 검증 후에만 C# 제품 코드와 전용 빌드 구성 제거.
 - [ ] v0.2.0 배포물 7개와 SHA256SUMS 검증. 실패 대상이 있으면 Release 공개하지 않는다.
 
 ## 진행 기록
@@ -115,3 +115,4 @@
 - C# 제거는 6개 대상 Python 배포 동등성 결과를 확인한 뒤 수행한다. 로컬 Linux 결과만으로 원래 코드를 제거하지 않는다.
 - 첫 CI는 YAML의 colon-containing plain command 때문에 job 시작 전 실패했다. block scalar로 수정하고 원격 검사를 다시 시작했다.
 - 원격 Windows x64 및 ARM64에서 frozen 도움말의 한국어가 CP1252 stdout에 기록되지 않는 실패를 확인했다. 실행 진입점의 stdout과 stderr를 UTF-8로 설정하고 회귀 테스트를 추가했다. 수정 후 두 Windows 네이티브 smoke가 통과했다. 전체 Python 테스트도 6개 네이티브 러너에서 실행하도록 확장했다.
+- 42942900574 실행에서 Python 3.12~3.14와 6개 네이티브 대상의 전체 테스트 및 패키징을 모두 통과했다. C# 제품 코드와 테스트, .NET 빌드 구성 및 전용 OpenSSL 빌드 스크립트를 제거했다. 과거 태그와 공개 Release는 변경하지 않았다.

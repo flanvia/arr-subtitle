@@ -1,6 +1,0 @@
-<Solution>
-  <Project Path="src/ArrSubtitle.Core/ArrSubtitle.Core.csproj" />
-  <Project Path="src/ArrSubtitle.Cli/ArrSubtitle.Cli.csproj" />
-  <Project Path="tests-dotnet/ArrSubtitle.Tests/ArrSubtitle.Tests.csproj" />
-  <Project Path="tests-dotnet/ArrSubtitle.Smoke/ArrSubtitle.Smoke.csproj" />
-</Solution>

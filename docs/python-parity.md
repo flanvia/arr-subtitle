@@ -2,7 +2,7 @@
 
 ## 기준
 
-C# `v0.1.2` 테스트의 동작 조건을 Python 테스트에 대응한다. C# 구현의 미검증 추측이나 알려진 결함을 그대로 재현하지 않는다. 현재 C# 코드는 비교용으로 남아 있다.
+C# `v0.1.2` 테스트의 동작 조건을 Python 테스트에 대응한다. C# 구현의 미검증 추측이나 알려진 결함을 그대로 재현하지 않는다. Python의 6개 대상 검사 통과 후 C# 제품 코드와 빌드 구성을 제거했다. 기존 소스와 테스트는 `v0.1.2` 태그에 보존된다.
 
 | C# 테스트 영역 | Python 대응 | 주요 검증 |
 | --- | --- | --- |
@@ -36,4 +36,6 @@ C# `v0.1.2` 테스트의 동작 조건을 Python 테스트에 대응한다. C# �
 - 고정 catalog SDK와 고정 Bazarr+ worker runner의 패키지 로드 및 비지원 미디어 계약을 검사했다.
 - 독립 ZIP을 원본 Core 경로가 없는 프로세스에서 풀어 search 및 download를 fixture로 검증한다.
 
-실제 Bazarr+ UI 설치, host의 SAMI 후처리와 6개 대상 빌드는 원격 또는 별도 host 검증 대상이다. 이 항목이 통과하기 전에 전체 배포 동등성을 완료로 표시하지 않는다.
+Python 3.12~3.14 검사와 6개 대상의 전체 테스트, 네이티브 빌드 및 smoke를 통과했다. 실행 기록: https://github.com/flanvia/arr-subtitle/actions/runs/42942900574
+
+실제 Bazarr+ UI 설치와 host의 SAMI 후처리는 별도 host 검증 대상이다. 실제 provider의 SAMI bytes 반환과 격리 worker 계약 검사는 통과했지만 UI 설치 검증을 대신하지 않는다.
