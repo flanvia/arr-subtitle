@@ -47,51 +47,51 @@
 
 ## Task 1: 모델과 실행 환경
 
-- [ ] 모델, budget, 설정, serialization과 pyproject 및 정확 의존성 lock 구현.
-- [ ] Python 안정 런타임의 프로젝트 venv 생성. 시스템 Python 설치를 변경하지 않는다.
-- [ ] `tests/test_models.py`에 회차 및 camelCase, invalid settings, deadline 검증.
-- [ ] `python -m unittest discover -s tests -v`: Task 1 테스트 통과.
+- [x] 모델, budget, 설정, serialization과 pyproject 및 정확 의존성 lock 구현.
+- [x] Python 안정 런타임의 프로젝트 venv 생성. 시스템 Python 설치를 변경하지 않는다.
+- [x] `tests/test_models.py`에 회차 및 camelCase, invalid settings, deadline 검증.
+- [x] `python -m unittest discover -s tests -v`: Task 1 테스트 통과.
 
 ## Task 2: 네트워크와 작품 식별
 
-- [ ] network.py와 identity.py 구현. DNS 결과를 고정한 실제 socket 연결과 hostname TLS 검증.
-- [ ] `tests/test_network.py`, `tests/test_identity.py`: 사설망, redirect, duplicate in-flight, 부분 제목, NFO 충돌, 시즌, 메타데이터 fallback 검증.
-- [ ] 같은 세션의 병렬 호출이 요청과 bytes를 공유하는지 검증.
+- [x] network.py와 identity.py 구현. DNS 결과를 고정한 실제 socket 연결과 hostname TLS 검증.
+- [x] `tests/test_network.py`, `tests/test_identity.py`: 사설망, redirect, duplicate in-flight, 부분 제목, NFO 충돌, 시즌, 메타데이터 fallback 검증.
+- [x] 같은 세션의 병렬 호출이 요청과 bytes를 공유하는지 검증.
 
 ## Task 3: 블로그와 자막
 
-- [ ] blogs.py, subtitles.py, numbering.py 구현.
-- [ ] `tests/test_blogs.py`, `tests/test_subtitles.py`: 피드 완전성, 반복 페이지, scope, category, ZIP 안전성, SAMI, 인코딩, 숫자 제목 및 누적 대응 검증.
-- [ ] 단일 무회차 파일 상속과 복수 회차의 모호성 거부 검증.
+- [x] blogs.py, subtitles.py, numbering.py 구현.
+- [x] `tests/test_blogs.py`, `tests/test_subtitles.py`: 피드 완전성, 반복 페이지, scope, category, ZIP 안전성, SAMI, 인코딩, 숫자 제목 및 누적 대응 검증.
+- [x] 단일 무회차 파일 상속과 복수 회차의 모호성 거부 검증.
 
 ## Task 4: 공통 검색과 수집
 
-- [ ] engine.py 구현. 발견과 download 모두 같은 candidate identity 판정을 사용한다.
-- [ ] 출처별 오프셋 충돌, 별칭 격리, missing 범위와 부분 실패 보존.
-- [ ] `tests/test_engine.py`: direct, batch, cumulative, unrelated aliases, multiple titles and declared gaps.
-- [ ] 기존 C# 테스트 이름과 Python 대응 테스트 목록을 `docs/python-parity.md`에 기록.
+- [x] engine.py 구현. 발견과 download 모두 같은 candidate identity 판정을 사용한다.
+- [x] 출처별 오프셋 충돌, 별칭 격리, missing 범위와 부분 실패 보존.
+- [x] `tests/test_engine.py`: direct, batch, cumulative, unrelated aliases, multiple titles and declared gaps.
+- [x] 기존 C# 테스트 이름과 Python 대응 테스트 목록을 `docs/python-parity.md`에 기록.
 
 ## Task 5: CLI와 폴더 병렬 다운로드
 
-- [ ] storage.py, batch.py, cli.py 구현. 기존 주요 명령과 bare path 지원.
-- [ ] 동시 파일 저장, 기존 자막 보호, 설정 optimistic lock, cancellation manifest.
-- [ ] `tests/test_cli.py`, `tests/test_storage.py`, `tests/test_batch.py`: 중복 회차 파일, 여러 작품, symlink, 경로만 입력, JSON 출력과 종료 코드.
-- [ ] 전체 Python 테스트 실행.
+- [x] storage.py, batch.py, cli.py 구현. 기존 주요 명령과 bare path 지원.
+- [x] 동시 파일 저장, 기존 자막 보호, 설정 optimistic lock, cancellation manifest.
+- [x] `tests/test_cli.py`, `tests/test_storage.py`, `tests/test_batch.py`: 중복 회차 파일, 여러 작품, symlink, 경로만 입력, JSON 출력과 종료 코드.
+- [x] 전체 Python 테스트 실행.
 
 ## Task 6: Bazarr+ 독립 플러그인
 
-- [ ] provider.py와 template manifest 구현. Core 복사, 파일 해시 및 catalog 생성은 build script에서 수행.
-- [ ] fallback_blogs, mappings_json, timeout 및 AniList 설정 validation.
-- [ ] 안정 후보 id, 재시작 가능한 payload, 한국어와 HI 및 forced 필터, SAMI format과 no filesystem writes.
-- [ ] `tests/test_provider.py`, `tests/test_bundle.py`: 격리된 bundle search/download, 설정 변경, tampered payload, hash 검증.
-- [ ] 고정 upstream SDK 및 worker의 실제 계약 검증.
+- [x] provider.py와 template manifest 구현. Core 복사, 파일 해시 및 catalog 생성은 build script에서 수행.
+- [x] fallback_blogs, mappings_json, timeout 및 AniList 설정 validation.
+- [x] 안정 후보 id, 재시작 가능한 payload, 한국어와 HI 및 forced 필터, SAMI format과 no filesystem writes.
+- [x] `tests/test_provider.py`, `tests/test_bundle.py`: 격리된 bundle search/download, 설정 변경, tampered payload, hash 검증.
+- [x] 고정 upstream SDK 및 worker의 실제 계약 검증.
 
 ## Task 7: 6개 CLI 배포와 전환
 
-- [ ] scripts/build_release.py 및 PyInstaller 설정, Python 3.12~3.14 테스트와 6개 네이티브 빌드 workflow.
+- [x] scripts/build_release.py 및 PyInstaller 설정, Python 3.12~3.14 테스트와 6개 네이티브 빌드 workflow.
 - [ ] 아카이브 단독 smoke, TLS 정상 및 잘못된 인증서 거부, Python 및 .NET 없는 환경 확인.
-- [ ] README 및 CLI, 검색, 플러그인 설치 문서 갱신. 기존 설정 호환 문서화.
-- [ ] C# 동작 조건 대응과 Python 전체 회귀, 별도 전체 변경 리뷰 및 수정.
+- [x] README 및 CLI, 검색, 플러그인 설치 문서 갱신. 기존 설정 호환 문서화.
+- [x] C# 동작 조건 대응과 Python 전체 회귀, 별도 전체 변경 리뷰 및 수정.
 - [ ] 검증 후에만 C# 제품 코드와 전용 빌드 구성 제거.
 - [ ] v0.2.0 배포물 7개와 SHA256SUMS 검증. 실패 대상이 있으면 Release 공개하지 않는다.
 
@@ -102,7 +102,7 @@
 ### 중간 검증과 판단
 
 - 모델, 네트워크, 식별, 블로그, 자막, 엔진, CLI, 플러그인 및 패키징 구현을 작성했다. C# 소스는 아직 비교 기준으로 남아 있다.
-- Python 전체 테스트 233개 통과 후 별도 리뷰를 진행했다. 리뷰 수정 테스트는 추가 중이다.
+- Python 전체 테스트 233개 통과 후 별도 리뷰를 진행했다. 출처 정규화, 개별 영상 메타데이터, 매핑 전달, caption 번호 체계, 끝 회차 누락, 헤더 deadline, 응답 메모리 전환과 짧은 Content-Length를 수정했다. 최종 전체 테스트 266개를 통과했다.
 - 실제 흉란영애 1~6화 검색, 정확 제목의 1~13화 검색과 누적 다운로드를 확인했다.
 - 선택 후보 다운로드가 전체 블로그를 다시 순회해 예산을 소진하므로 선택 출처와 해당 caption만 재검증하도록 변경했다. 실제 플러그인 1화 다운로드는 5.556초에 성공하고 64,858 bytes의 SHA-256이 일치했다.
 - Linux x64 runtime 포함 CLI를 빌드했다. Python, .NET 및 호스트 OpenSSL 없는 Ubuntu 컨테이너의 fixture와 TLS smoke를 통과했다.
@@ -110,3 +110,7 @@
 - 카테고리와 누적 회차만으로 낯선 작품명을 별칭으로 승격하지 않는다. C#의 일부 약칭 자동 승인이 더 이상 통과하지 않을 수 있다. 실제 작품 근거가 없는 약칭은 명시 매핑으로 처리한다.
 - 동일한 title-based 출력 stem 충돌은 작품 번호를 이름에 포함해 방지한다. 영상 옆 sidecar 이름은 기존대로 유지한다.
 - 커뮤니티 카탈로그는 별도 `provider-catalog` 브랜치에 실제 Core 파일을 먼저 게시하고 그 commit을 manifest가 참조하도록 한다. Release ZIP의 내부 해시만으로 원격 설치 성공을 주장하지 않는다.
+- 리뷰의 category 별칭 승격은 제거했다. 기존 허용보다 보수적이므로 낯선 작품 약칭은 명시 매핑이 필요할 수 있다.
+- Windows의 악의적인 동시 junction 교체를 kernel handle로 방어하는 것은 구현하지 않았다. 경로 재검사와 no-clobber는 유지하며 실제 Windows 동작은 CI로 검증한다. 공격자가 쓰기 권한을 가진 부모 디렉터리를 실행 중 교체하는 환경에서는 경로 보호가 완전하지 않을 수 있다.
+- C# 제거는 6개 대상 Python 배포 동등성 결과를 확인한 뒤 수행한다. 로컬 Linux 결과만으로 원래 코드를 제거하지 않는다.
+- 첫 CI는 YAML의 colon-containing plain command 때문에 job 시작 전 실패했다. block scalar로 수정하고 원격 검사를 다시 시작했다.
