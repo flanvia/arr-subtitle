@@ -123,6 +123,8 @@ jobs:
         env:
           EXPECTED_TARGET: ${{ matrix.target }}
         run: python -c "import os, platform; from scripts.build_release import BUILD_PYTHON, native_target; assert platform.python_version() == BUILD_PYTHON; assert native_target() == os.environ['EXPECTED_TARGET']"
+      - name: Run platform unit and integration tests
+        run: python -m unittest discover -s tests -v
       - name: Build, unpack and smoke-test native bundles
         run: python scripts/build_release.py
       - name: Create local TLS fixture
