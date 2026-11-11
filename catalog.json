@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "name": "arr-subtitle 커뮤니티 카탈로그",
+  "providers": [
+    {
+      "manifest": {
+        "api_version": "bazarr.provider-hub.v1",
+        "bundle_sha256": "d78065e9e43e4e66c8dbba1f6e6af96014c2e7dff315c8a3d55074b87dc7aa78",
+        "config_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "anilist_enabled": {
+              "default": true,
+              "description": "영문 및 로마자 제목 식별에 AniList를 사용합니다.",
+              "title": "AniList 제목 식별",
+              "type": "boolean"
+            },
+            "fallback_blogs": {
+              "default": "",
+              "description": "한 줄에 공개 블로그 URL 하나를 입력합니다.",
+              "title": "추가 블로그",
+              "type": "string"
+            },
+            "mappings_json": {
+              "default": "[]",
+              "description": "title, season, animeId 등을 포함한 JSON 배열입니다.",
+              "title": "작품 매핑",
+              "type": "string"
+            },
+            "timeout": {
+              "default": 20,
+              "description": "검색과 다운로드 각각에 적용할 내부 제한 시간입니다.",
+              "maximum": 20,
+              "minimum": 1,
+              "title": "제한 시간(초)",
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "dependencies": {
+          "requirements": [
+            {
+              "hashes": [
+                "sha256:0918bfe44902e6ad8d57732ba310582e98da931428d231a5ecb9e7c703a735bb"
+              ],
+              "name": "beautifulsoup4",
+              "version": "4.14.3"
+            },
+            {
+              "hashes": [
+                "sha256:e4d667b3974ce6e038e7390486b8093369854a1d345ffdd4c121dfc4a782e809"
+              ],
+              "name": "soupsieve",
+              "version": "4.1"
+            },
+            {
+              "hashes": [
+                "sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"
+              ],
+              "name": "typing_extensions",
+              "version": "4.16.0"
+            }
+          ]
+        },
+        "description": "한국어 애니메이션 회차 자막을 검색합니다.",
+        "entry_class": "ArrSubtitleProvider",
+        "entry_module": "provider",
+        "files": {
+          "arr_subtitle/__init__.py": "38729ed8785d4ca2132ed1e1a3cc02d29d71a6cdea70a9b08e50ca703d4aac8b",
+          "arr_subtitle/blogs.py": "d1b051983f8980907a7ad729e179c83be7b54ba1186f012856cefc943dc7232a",
+          "arr_subtitle/engine.py": "2f3c9a8b7dd0d3f9e0ff5ab2592e536999a89c52953f13814474927f933b70db",
+          "arr_subtitle/identity.py": "db394bcff3ee38e395e4e66ef24ace3a91a97723c92f3952e5a827a99f94a715",
+          "arr_subtitle/models.py": "dbe0d2f2767c1b3d7272508409c30b2eed5ba3bd1cdf786ec5e69656728a4395",
+          "arr_subtitle/network.py": "622f0d1f0b315d555eb776ed8b9f403ad902e6ce8cb580099778d40aed212b43",
+          "arr_subtitle/numbering.py": "100de59c3f4dded11996c76654e23974ac2fe013b3fa26b0055d6c0f3c070d09",
+          "arr_subtitle/serialization.py": "e12fc70c5f8707f140cb7b1d780c1ed02f8ebd18985453f4c9878569d6a57194",
+          "arr_subtitle/settings.py": "9b431bf7b7dfe14aa67a3cf1ba3bbad8e6740cb090ac6422ed39c7f3e6329fb3",
+          "arr_subtitle/storage.py": "5f9ebbc25ea5d185f7153f88881365a65e1a2511cdf479d0d62f86f8c65777c4",
+          "arr_subtitle/subtitles.py": "0c1b1ab5539d0332442c54902dcade63bfaa3e0fa39217219ab5cf70e6711a72",
+          "provider.py": "bf0397dffb1f1c68d6643b7272101938bcb861f267c2916586a812bfa5695944"
+        },
+        "languages": [
+          "kor"
+        ],
+        "name": "arr-subtitle",
+        "provider_id": "arr_subtitle",
+        "schema_version": 1,
+        "secret_fields": [],
+        "source": {
+          "type": "github",
+          "repo": "flanvia/arr-subtitle",
+          "ref": "5fc146f1ad251f304bb8b3c6f090457fe6599977",
+          "commit": "5fc146f1ad251f304bb8b3c6f090457fe6599977",
+          "path": "providers/arr_subtitle",
+          "trusted": false,
+          "catalog_url": "https://github.com/flanvia/arr-subtitle/blob/provider-catalog/catalog.json"
+        },
+        "supported_media": [
+          "episode"
+        ],
+        "version": "0.2.0"
+      }
+    }
+  ]
+}
